@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Cabecera -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textColor="@color/text_primary"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="@string/subtitle"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+
+        <!-- Aviso -->
+        <LinearLayout
+            style="@style/Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/warning_bg"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/disclaimer_title"
+                android:textColor="@color/warning_text"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/disclaimer_body"
+                android:textColor="@color/warning_text"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- Estado -->
+        <LinearLayout
+            style="@style/Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/CardTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/card_status" />
+
+            <TextView
+                android:id="@+id/statusEngine"
+                style="@style/RowLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/status_checking" />
+
+            <TextView
+                android:id="@+id/statusProvider"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="—"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                tools:ignore="HardcodedText" />
+
+            <!-- Idioma de la UI (sistema / español / inglés). Altura FIJA y
+                 compacta (40dp) para que el Spinner no herede la altura mínima
+                 grande del tema de Android 12 / HarmonyOS, que generaba un
+                 espacio blanco excesivo dentro de la tarjeta Status. El ancho
+                 sigue siendo wrap_content para adaptarse a pantallas
+                 estrechas (smartphone) y anchas (tablet). -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/RowLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:labelFor="@id/spinnerUiLanguage"
+                    android:text="@string/app_language_label" />
+
+                <Spinner
+                    android:id="@+id/spinnerUiLanguage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:minHeight="40dp"
+                    android:minWidth="140dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Último error -->
+        <LinearLayout
+            style="@style/Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/CardTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/card_error" />
+
+            <TextView
+                android:id="@+id/textLastError"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/no_errors"
+                android:textColor="@color/error_text"
+                android:textSize="13sp" />
+
+            <TextView
+                style="@style/HintNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/diag_last_handshake" />
+
+            <!-- Diagnóstico del último handshake: mismo formato monoespaciado
+                 que la tarjeta de endpoints, para que sea legible por igual en
+                 el smartphone y en la tablet. -->
+            <TextView
+                android:id="@+id/textHandshakeDebug"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@color/mono_bg"
+                android:fontFamily="monospace"
+                android:padding="10dp"
+                android:textColor="@color/mono_text"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Voz -->
+        <LinearLayout
+            style="@style/Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/CardTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/card_voice" />
+
+            <!-- Actualizar catálogo y contador de voces, arriba del selector
+                 (a petición del usuario). -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnRefreshCatalog"
+                    style="@style/GhostButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/action_refresh_catalog" />
+
+                <TextView
+                    android:id="@+id/labelVoiceCount"
+                    style="@style/HintNote"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="end"
+                    android:text="—"
+                    tools:ignore="HardcodedText" />
+            </LinearLayout>
+
+            <Spinner
+                android:id="@+id/spinnerVoice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp" />
+
+            <Switch
+                android:id="@+id/switchUnifiedVoice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/unified_voice_switch" />
+
+            <TextView
+                style="@style/HintNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/unified_voice_hint" />
+
+            <TextView
+                android:id="@+id/textVoiceDisclaimer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@color/warning_bg"
+                android:padding="10dp"
+                android:text="@string/voice_source_disclaimer"
+                android:textColor="@color/warning_text"
+                android:textSize="12.5sp" />
+        </LinearLayout>
+
+        <!-- Velocidad y tono -->
+        <LinearLayout
+            style="@style/Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/CardTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/card_params" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/RowLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_rate" />
+
+                <SeekBar
+                    android:id="@+id/sliderRate"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="100" />
+
+                <TextView
+                    android:id="@+id/labelRateValue"
+                    style="@style/RowLabel"
+                    android:layout_width="56dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:text="+0%"
+                    tools:ignore="HardcodedText" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/HintNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/hint_rate" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/RowLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_pitch" />
+
+                <SeekBar
+                    android:id="@+id/sliderPitch"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="100" />
+
+                <TextView
+                    android:id="@+id/labelPitchValue"
+                    style="@style/RowLabel"
+                    android:layout_width="56dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:text="+0Hz"
+                    tools:ignore="HardcodedText" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/HintNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/hint_pitch" />
+
+            <Button
+                android:id="@+id/btnResetParams"
+                style="@style/GhostButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/action_reset_params" />
+        </LinearLayout>
+
+        <!-- Caché -->
+        <LinearLayout
+            style="@style/Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/CardTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/card_cache" />
+
+            <Switch
+                android:id="@+id/switchCache"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/cache_switch" />
+
+            <TextView
+                android:id="@+id/labelCacheSize"
+                style="@style/HintNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="—"
+                tools:ignore="HardcodedText" />
+
+            <TextView
+                style="@style/HintNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/cache_note" />
+
+            <Button
+                android:id="@+id/btnClearCache"
+                style="@style/GhostButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/action_clear_cache" />
+        </LinearLayout>
+
+        <!-- Endpoints y handshake -->
+        <LinearLayout
+            style="@style/Card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/CardTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/card_endpoints" />
+
+            <TextView
+                android:id="@+id/textEndpoints"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/mono_bg"
+                android:fontFamily="monospace"
+                android:padding="10dp"
+                android:text="—"
+                android:textColor="@color/mono_text"
+                android:textSize="11sp"
+                tools:ignore="HardcodedText" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnEditUserAgent"
+                    style="@style/GhostButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/action_edit_user_agent" />
+
+                <Button
+                    android:id="@+id/btnEditOrigin"
+                    style="@style/GhostButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/action_edit_origin" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Acciones -->
+        <Button
+            android:id="@+id/btnTestVoice"
+            style="@style/PrimaryButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/action_test" />
+
+        <Button
+            android:id="@+id/btnOpenTtsSettings"
+            style="@style/GhostButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/action_open_tts_settings" />
+
+        <Button
+            android:id="@+id/btnReset"
+            style="@style/GhostButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:text="@string/action_reset" />
+
+    </LinearLayout>
+</ScrollView>
