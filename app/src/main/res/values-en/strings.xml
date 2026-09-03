@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English UI. The app follows the device language; it can also be forced
+     with the in-app selector (works on every Android version) or, on
+     Android 13+, via Settings → Apps → Edge Read Aloud TTS → Language. -->
+<resources>
+    <string name="subtitle">Experimental Android TTS engine · initial voice es-MX-DaliaNeural</string>
+
+    <string name="disclaimer_title">Important notice</string>
+    <string name="disclaimer_body">This engine uses an UNOFFICIAL Microsoft Edge Read Aloud protocol that is not published as a stable API: it may change or be blocked at any time. The text you synthesize is sent to remote servers; do not enable the cache if you do not want audio stored locally. The app does not collect accounts, cookies or credentials.</string>
+
+    <!-- Cards -->
+    <string name="card_status">Status</string>
+    <string name="card_error">Last error</string>
+    <string name="card_voice">Voice</string>
+    <string name="card_params">Rate and pitch</string>
+    <string name="card_cache">Audio cache</string>
+    <string name="card_endpoints">Endpoints &amp; handshake</string>
+
+    <!-- UI language -->
+    <string name="app_language_label">App language · Idioma de la aplicación</string>
+    <string-array name="ui_language_options">
+        <item>System language · Idioma del sistema</item>
+        <item>Español</item>
+        <item>English</item>
+    </string-array>
+
+    <!-- Parameters -->
+    <string name="label_rate">Rate</string>
+    <string name="label_pitch">Pitch</string>
+    <string name="hint_rate" formatted="false">Slide from -50% to +50% · the middle (0) is the normal rate of the voice</string>
+    <string name="hint_pitch" formatted="false">Slide from -50Hz to +50Hz · the middle (0) is the normal pitch of the voice</string>
+    <string name="params_persist_hint">These settings are saved on exit and respected by every app that uses this engine (Play Books, Neo Reader…).</string>
+
+    <!-- Actions -->
+    <string name="action_test">Test voice</string>
+    <string name="action_refresh_catalog">Refresh catalog</string>
+    <string name="action_clear_cache">Clear cache</string>
+    <string name="action_reset">Reset settings</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_reset_params">Reset rate and pitch</string>
+    <string name="params_reset_done">Rate and pitch reset to their normal values.</string>
+    <string name="action_restore_user_agent">Restore suggested</string>
+    <string name="action_edit_user_agent">Edit User-Agent</string>
+    <string name="action_edit_origin">Edit Origin</string>
+    <string name="action_open_tts_settings">Open system Text-to-speech settings</string>
+    <string name="tts_settings_unavailable">This device does not expose the system Text-to-speech screen.</string>
+
+    <!-- Cache -->
+    <string name="cache_switch">Store synthesized audio on this device</string>
+    <string name="cache_note">Key SHA-256(text+voice+locale+rate+pitch+version). Max 100 MB; oldest files are evicted automatically.</string>
+    <string name="cache_used_fmt">Used: %1$s of %2$s</string>
+    <string name="cache_freed_fmt">Cache cleared (%1$s freed).</string>
+
+    <!-- Status & errors -->
+    <string name="no_errors">No errors recorded.</string>
+    <string name="status_checking">Checking engine registration…</string>
+    <string name="status_declared_checking">TTS service declared ✓ · checking system visibility…</string>
+    <string name="status_not_declared">TTS service not declared in the manifest (reinstall the APK).</string>
+    <string name="status_visible_fmt">Visible as a system TTS engine ✓ (%1$d engines visible)</string>
+    <string name="engines_visible_fmt">engines visible: %1$d</string>
+    <string name="status_restricted">TTS service declared ✓, but Android does NOT expose it as an engine (restricted settings).</string>
+    <string name="restricted_hint">Android 13+ blocks TTS engines from APK-installed apps. Enable it: Settings → Apps → Edge Read Aloud TTS → “Allow restricted settings” (or via adb: appops set --uid dev.experimental.edgetts android:allow_restricted_settings allow). Then select the engine in Settings → Text-to-speech.</string>
+    <string name="diag_last_handshake">Last handshake diagnostics:</string>
+    <string name="settings_reset_done">Settings restored to their initial values.</string>
+
+    <!-- Voice -->
+    <string name="test_phrase">Hello. This is a test of the Edge Read Aloud engine. The voice you hear is synthesized in the cloud.</string>
+    <string name="voice_count_fmt">%1$d voices in catalog · %2$d es-MX</string>
+    <string name="unified_voice_switch">The voice chosen here drives the whole system</string>
+    <string name="unified_voice_hint">This switch decides WHICH VOICE is used, not whether the system controls the engine. On: the whole system uses the voice chosen above for its language; if a book is in Spanish and your voice is another language, your last Spanish voice (a familiar one) is used. Off: the system picks the voice by each language country. The rate, pitch and example controls in Settings work either way, because they depend on the engine reporting its language, not on this switch.</string>
+    <string name="voice_source_disclaimer">The TTS engine will use the voice selected in THIS APP, not the one from the Android system, because this app offers more than one voice per language and region (the system offers only one). For it to work, choose "Edge Read Aloud TTS" as the preferred engine in Settings → Text-to-speech. For other languages, a catalog voice is used automatically.</string>
+    <string name="catalog_updating">Refreshing catalog…</string>
+    <string name="catalog_updated_fmt">Catalog updated (%1$d voices).</string>
+    <string name="catalog_offline">Catalog unavailable; using local fallback es-MX-DaliaNeural.</string>
+    <string name="test_starting">Starting the engine…</string>
+    <string name="test_voice_setup">setLanguage(%1$s)=%2$d · setVoice(%3$s)=%4$d · engine voice=%5$s</string>
+    <string name="test_init_failed">Could not start the engine. Check in Settings → Text-to-speech that this package is installed.</string>
+    <string name="test_synth">Synthesizing with %1$s…</string>
+    <string name="test_ok">Test completed successfully.</string>
+    <string name="test_failed_fmt">The test failed: %1$s</string>
+    <string name="test_failed_generic">Synthesis error.</string>
+    <string name="test_rejected">The TTS client rejected the test request.</string>
+    <string name="test_cancelled_restricted">Test cancelled: the system does not allow binding this engine (restricted settings).</string>
+
+    <!-- Endpoints -->
+    <string name="ep_voices">Voices</string>
+    <string name="ep_ws">WS</string>
+    <string name="ep_origin">Origin</string>
+    <string name="ep_ua">UA</string>
+
+    <!-- User-Agent -->
+    <string name="user_agent_dialog_title">Edge User-Agent</string>
+    <string name="user_agent_dialog_hint">Use the DESKTOP Edge one with major version and zeros. Verified: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0 — The Sec-MS-GEC token uses version 1-143.0.3650.75 independently.</string>
+    <string name="user_agent_updated">User-Agent updated. The next synthesis will use it.</string>
+    <string name="user_agent_restored">User-Agent restored to the verified value.</string>
+
+    <!-- Origin -->
+    <string name="origin_dialog_title">Handshake Origin</string>
+    <string name="origin_dialog_hint">The handshake may require a specific Origin. Try, in order: chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold (immersive reader, verified) and https://www.bing.com. It is saved and used by the next synthesis.</string>
+    <string name="origin_updated">Origin updated. The next synthesis will use it.</string>
+    <string name="origin_restored">Origin restored to the verified value.</string>
+</resources>

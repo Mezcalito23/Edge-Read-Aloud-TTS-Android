@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Necesario para el WebSocket de síntesis y el catálogo de voces. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 11+: sin esto, queryIntentServices no ve los demás motores
+         TTS y TextToSpeech.getEngines() devuelve una lista vacía. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.EdgeTts">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Permite que Ajustes → Texto a voz abra directamente esta
+                 pantalla como configuración del motor (además del
+                 settingsActivity del meta-data). -->
+            <intent-filter>
+                <action android:name="android.speech.tts.engine.CONFIGURE_ENGINE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Contrato de motor TTS: las apps que usan TTS local (p. ej. Google
+             Play Books) lanzan ACTION_CHECK_TTS_DATA para comprobar que el
+             motor tiene datos de voz; sin esta actividad hacen fallback a
+             Google TTS sin siquiera probar el motor. -->
+        <activity
+            android:name=".CheckVoiceData"
+            android:directBootAware="true"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.speech.tts.engine.CHECK_TTS_DATA" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Texto de ejemplo: lo lanza el botón "Escuchar ejemplo" de la
+             pantalla del motor en Ajustes. Responde en el idioma pedido. -->
+        <activity
+            android:name=".GetSampleText"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.speech.tts.engine.GET_SAMPLE_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Instalación de datos de voz: el motor es 100 % en línea, no hay
+             nada que instalar; responde que los datos ya están disponibles. -->
+        <activity
+            android:name=".InstallVoiceData"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.speech.tts.engine.INSTALL_TTS_DATA" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Motor TTS del sistema. El framework lo vincula con
+             android.permission.BIND_TEXT_TO_SPEECH; nadie más puede hacerlo. -->
+        <service
+            android:name=".EdgeReadAloudTtsService"
+            android:label="@string/tts_engine_label"
+            android:permission="android.permission.BIND_TEXT_TO_SPEECH"
+            android:exported="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.TTS_SERVICE" />
+                <!-- OBLIGATORIO: TextToSpeech.getEngines() consulta con
+                     PackageManager.MATCH_DEFAULT_ONLY, que excluye cualquier
+                     servicio que no declare esta categoría. Sin ella el motor
+                     no aparece en Ajustes → Texto a voz. -->
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech.tts"
+                android:resource="@xml/tts_engine" />
+        </service>
+
+    </application>
+
+</manifest>

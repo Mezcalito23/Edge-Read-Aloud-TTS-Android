@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Declaración del motor TTS para el framework. El tag correcto es
+     <tts-engine> (los tags legacy <ttsservice>/<languages> son de la API 1
+     y ya no aplican). settingsActivity apunta a la pantalla de
+     configuración del motor. -->
+<tts-engine xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="dev.experimental.edgetts.MainActivity" />

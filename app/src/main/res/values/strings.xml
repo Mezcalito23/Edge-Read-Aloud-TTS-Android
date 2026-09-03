@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Edge Read Aloud TTS</string>
+    <string name="tts_engine_label">Edge Read Aloud TTS</string>
+
+    <string name="subtitle">Motor TTS experimental para Android · voz inicial es-MX-DaliaNeural</string>
+
+    <string name="disclaimer_title">Aviso importante</string>
+    <string name="disclaimer_body">Este motor usa un protocolo NO oficial de Microsoft Edge Read Aloud que no está publicado como API estable: puede cambiar o bloquearse en cualquier momento. El texto que sintetices se envía a servidores remotos; no actives la caché si no quieres conservar audio localmente. La app no recopila cuentas, cookies ni credenciales.</string>
+
+    <!-- Tarjetas -->
+    <string name="card_status">Estado</string>
+    <string name="card_error">Último error</string>
+    <string name="card_voice">Voz</string>
+    <string name="card_params">Velocidad y tono</string>
+    <string name="card_cache">Caché de audio</string>
+    <string name="card_endpoints">Endpoints y handshake</string>
+
+    <!-- Idioma de la UI -->
+    <string name="app_language_label">Idioma de la aplicación · App language</string>
+    <string-array name="ui_language_options">
+        <item>Idioma del sistema · System language</item>
+        <item>Español</item>
+        <item>English</item>
+    </string-array>
+
+    <!-- Parámetros -->
+    <string name="label_rate">Velocidad</string>
+    <string name="label_pitch">Tono</string>
+    <string name="hint_rate" formatted="false">Desliza de -50% a +50% · el centro (0) es la velocidad normal de la voz</string>
+    <string name="hint_pitch" formatted="false">Desliza de -50Hz a +50Hz · el centro (0) es el tono normal de la voz</string>
+    <string name="params_persist_hint">Estos ajustes se guardan al salir y los respetan todas las apps que usen este motor (Play Books, Neo Reader…).</string>
+
+    <!-- Acciones -->
+    <string name="action_test">Probar voz</string>
+    <string name="action_refresh_catalog">Actualizar catálogo</string>
+    <string name="action_clear_cache">Borrar caché</string>
+    <string name="action_reset">Restablecer configuración</string>
+    <string name="action_save">Guardar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_reset_params">Restablecer velocidad y tono</string>
+    <string name="params_reset_done">Velocidad y tono restablecidos a sus valores normales.</string>
+    <string name="action_restore_user_agent">Restaurar sugerido</string>
+    <string name="action_edit_user_agent">Editar User-Agent</string>
+    <string name="action_edit_origin">Editar Origin</string>
+    <string name="action_open_tts_settings">Abrir Ajustes de Texto a voz del sistema</string>
+    <string name="tts_settings_unavailable">Este dispositivo no expone la pantalla de Texto a voz del sistema.</string>
+
+    <!-- Caché -->
+    <string name="cache_switch">Guardar audio sintetizado en este dispositivo</string>
+    <string name="cache_note">Clave SHA-256(texto+voz+locale+rate+pitch+versión). Máx. 100 MB; los archivos antiguos se eliminan solos.</string>
+    <string name="cache_used_fmt">Ocupada: %1$s de %2$s</string>
+    <string name="cache_freed_fmt">Caché borrada (%1$s liberados).</string>
+
+    <!-- Estado y errores -->
+    <string name="no_errors">Sin errores registrados.</string>
+    <string name="status_checking">Comprobando registro del motor…</string>
+    <string name="status_declared_checking">Servicio TTS declarado ✓ · comprobando visibilidad del sistema…</string>
+    <string name="status_not_declared">Servicio TTS no declarado en el manifiesto (reinstala la APK).</string>
+    <string name="status_visible_fmt">Visible como motor TTS del sistema ✓ (%1$d motores visibles)</string>
+    <string name="engines_visible_fmt">motores visibles: %1$d</string>
+    <string name="status_restricted">Servicio TTS declarado ✓, pero Android NO lo expone como motor (ajustes restringidos).</string>
+    <string name="restricted_hint">Android 13+ bloquea los motores TTS de apps instaladas desde APK. Actívalo: Ajustes → Aplicaciones → Edge Read Aloud TTS → «Permitir ajustes restringidos» (o vía adb: appops set --uid dev.experimental.edgetts android:allow_restricted_settings allow). Después selecciona el motor en Ajustes → Texto a voz.</string>
+    <string name="diag_last_handshake">Diagnóstico del último handshake:</string>
+    <string name="settings_reset_done">Configuración restablecida a los valores iniciales.</string>
+
+    <!-- Voz -->
+    <string name="test_phrase">Hola. Esta es una prueba del motor Edge Read Aloud. La voz que escuchas se sintetiza en la nube.</string>
+    <string name="voice_count_fmt">%1$d voces en catálogo · %2$d es-MX</string>
+    <string name="unified_voice_switch">La voz elegida aquí manda en todo el sistema</string>
+    <string name="unified_voice_hint">Este botón decide QUÉ VOZ se usa, no si el sistema controla el motor. Activado: todo el sistema usa la voz elegida arriba para su idioma; si un libro está en español y tu voz es de otro idioma, se usa tu última voz de español (reconocible). Desactivado: el sistema elige la voz por el país de cada idioma. La velocidad, el tono y el ejemplo de Ajustes funcionan en ambos casos, porque dependen de que el motor reporte su idioma, no de este botón.</string>
+    <string name="voice_source_disclaimer">La voz que genere el motor TTS será la seleccionada en ESTA APP, no la del sistema Android, porque aquí hay más de una voz por idioma y región (el sistema solo ofrece una). Para que funcione como motor, debes elegir «Edge Read Aloud TTS» como motor preferido en Ajustes → Texto a voz del sistema. Para otros idiomas se usa automáticamente una voz del catálogo.</string>
+    <string name="catalog_updating">Actualizando catálogo…</string>
+    <string name="catalog_updated_fmt">Catálogo actualizado (%1$d voces).</string>
+    <string name="catalog_offline">Catálogo no disponible; usando respaldo local es-MX-DaliaNeural.</string>
+    <string name="test_starting">Iniciando el motor…</string>
+    <string name="test_voice_setup">setLanguage(%1$s)=%2$d · setVoice(%3$s)=%4$d · voz del motor=%5$s</string>
+    <string name="test_init_failed">No se pudo iniciar el motor. Comprueba en Ajustes → Texto a voz que esté instalado este paquete.</string>
+    <string name="test_synth">Sintetizando con %1$s…</string>
+    <string name="test_ok">Prueba completada con éxito.</string>
+    <string name="test_failed_fmt">La prueba falló: %1$s</string>
+    <string name="test_failed_generic">Error de síntesis.</string>
+    <string name="test_rejected">El cliente TTS rechazó la solicitud de prueba.</string>
+    <string name="test_cancelled_restricted">Prueba cancelada: el sistema no permite vincular este motor (ajustes restringidos).</string>
+
+    <!-- Endpoints -->
+    <string name="ep_voices">Voces</string>
+    <string name="ep_ws">WS</string>
+    <string name="ep_origin">Origin</string>
+    <string name="ep_ua">UA</string>
+
+    <!-- User-Agent -->
+    <string name="user_agent_dialog_title">User-Agent de Edge</string>
+    <string name="user_agent_dialog_hint">Usa el de Edge de ESCRITORIO con versión mayor y ceros. Verificado: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0 — El token Sec-MS-GEC usa la versión 1-143.0.3650.75 de forma independiente.</string>
+    <string name="user_agent_updated">User-Agent actualizado. La próxima síntesis ya lo usa.</string>
+    <string name="user_agent_restored">User-Agent restaurado al valor verificado.</string>
+
+    <!-- Origin -->
+    <string name="origin_dialog_title">Origin del handshake</string>
+    <string name="origin_dialog_hint">El handshake puede exigir un Origin concreto. Prueba, en orden: chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold (lector inmersivo, verificado) y https://www.bing.com. Se guarda y se usa en la próxima síntesis.</string>
+    <string name="origin_updated">Origin actualizado. La próxima síntesis ya lo usa.</string>
+    <string name="origin_restored">Origin restaurado al valor verificado.</string>
+</resources>
