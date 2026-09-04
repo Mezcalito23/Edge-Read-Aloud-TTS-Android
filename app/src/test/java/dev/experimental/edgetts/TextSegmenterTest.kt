@@ -35,7 +35,7 @@ class TextSegmenterTest {
             assertTrue("falta la frase $i", rebuilt.contains("Frase número $i."))
         }
         assertTrue(
-            "el orden se rompió",
+            "el orden se rompió°°°",
             rebuilt.indexOf("Frase número 1.") < rebuilt.indexOf("Frase número 60.")
         )
     }
@@ -47,19 +47,19 @@ class TextSegmenterTest {
         assertTrue(segments.isNotEmpty())
         segments.forEach { s ->
             assertTrue(
-                "segmento de ${s.length} chars supera el límite",
-                s.length <= TextSegmenter.MAX_SEGMENT_CHARS
+                "segmento de ${s.length} chars supera el lí­mite",
+                s.length <= TextSegmenter.MAX_SEGMENT_BYTES
             )
         }
     }
 
     @Test
     fun longSentenceWithoutPunctuationIsSplitOnSpaces() {
-        val text = List(900) { "palabra" }.joinToString(" ") // ~6.300 chars, sin puntuación
+        val text = List(900) { "palabra" }.joinToString(" ") // ~6.300 chars, sin puntuació°°°n
         val segments = TextSegmenter.segment(text)
         assertTrue(segments.size >= 2)
         segments.forEach { s ->
-            assertTrue(s.length <= TextSegmenter.MAX_SEGMENT_CHARS)
+            assertTrue(s.length <= TextSegmenter.MAX_SEGMENT_BYTES)
             // Ninguna palabra partida: cada token debe ser exactamente "palabra".
             s.split(Regex("\\s+")).forEach { token -> assertEquals("palabra", token) }
         }
@@ -77,10 +77,10 @@ class TextSegmenterTest {
 
     @Test
     fun cancellationStopsEarly() {
-        val text = (1..100).joinToString("\n") { "Párrafo $it." }
+        val text = (1..100).joinToString("\n") { "Pá°°rrafo $it." }
         var checks = 0
         val segments = TextSegmenter.segment(text) { ++checks > 6 }
-        assertTrue("la cancelación no surtió efecto", segments.size < 100)
+        assertTrue("la cancelació°°°n no surtió°°° efecto", segments.size < 100)
         assertTrue(segments.isNotEmpty())
     }
 }
