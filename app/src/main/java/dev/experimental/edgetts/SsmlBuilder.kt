@@ -1,5 +1,7 @@
 package dev.experimental.edgetts
 
+import android.util.Log
+
 /**
  * Genera el SSML con el formato EXACTO del cliente de referencia
  * (rany2/edge-tts, mkssml + TTSConfig), verificado en vivo:
@@ -15,6 +17,8 @@ package dev.experimental.edgetts
  * emite únicamente speak + voice + texto.
  */
 object SsmlBuilder {
+
+    private const val TAG = "EdgeTtsService"
 
     /** Escapa los cinco caracteres XML, en el orden correcto (& primero). */
     fun escapeXml(raw: String): String = buildString(raw.length + 16) {
@@ -123,6 +127,10 @@ object SsmlBuilder {
         minimal: Boolean = false
     ): String {
         val xmlLang = extractLocaleFromVoice(voice)
+        Log.d(
+            TAG,
+            "SsmlBuilder.build: voice=$voice xmlLang=$xmlLang rate=$rate pitch=$pitch minimal=$minimal"
+        )
         return buildString {
             append("<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='")
             append(escapeXml(xmlLang))
