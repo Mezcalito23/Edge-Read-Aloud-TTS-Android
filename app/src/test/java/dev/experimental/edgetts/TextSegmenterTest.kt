@@ -32,7 +32,7 @@ class TextSegmenterTest {
         val segments = TextSegmenter.segment(text)
         val rebuilt = segments.joinToString(" ")
         for (i in 1..60) {
-            assertTrue("falta la frase $i", rebuilt.contains("Frase número $it."))
+            assertTrue("falta la frase $i", rebuilt.contains("Frase número $i."))
         }
         assertTrue(
             "el orden se rompió°°°",
