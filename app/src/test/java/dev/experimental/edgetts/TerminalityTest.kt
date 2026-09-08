@@ -51,7 +51,13 @@ class TerminalityTest {
         }
 
         override fun error(errorCode: Int) {
-            error() // Delegar a error() sin cÃ³digo para este test
+            // Usar directamente la misma guarda que error() sin cÃ³digo
+            if (errorCalled.getAndSet(true)) {
+                throw IllegalStateException("error() called multiple times")
+            }
+            hasFinishedValue.set(true)
+            terminalCalls.incrementAndGet()
+            latch.countDown()
         }
 
         override fun audioAvailable(buffer: ByteArray, offset: Int, length: Int): Int {
