@@ -50,6 +50,10 @@ class TerminalityTest {
             latch.countDown()
         }
 
+        override fun error(errorCode: Int) {
+            error() // Delegar a error() sin cÃ³digo para este test
+        }
+
         override fun audioAvailable(buffer: ByteArray, offset: Int, length: Int): Int {
             return 0
         }
@@ -97,6 +101,21 @@ class TerminalityTest {
         // Second call should throw
         try {
             callback.error()
+            throw AssertionError("Expected IllegalStateException")
+        } catch (e: IllegalStateException) {
+            assertTrue(e.message!!.contains("multiple times"))
+        }
+    }
+
+    @Test
+    fun errorWithCodeCalledExactlyOnce() {
+        val callback = FakeCallback()
+        callback.error(1) // Con cÃ³digo
+        assertTrue(callback.isTerminal())
+        assertEquals(1, callback.terminalCalls.get())
+        // Second call should throw
+        try {
+            callback.error(2)
             throw AssertionError("Expected IllegalStateException")
         } catch (e: IllegalStateException) {
             assertTrue(e.message!!.contains("multiple times"))
