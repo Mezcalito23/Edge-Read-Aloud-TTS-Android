@@ -1,7 +1,6 @@
 package dev.experimental.edgetts
 
 import android.speech.tts.SynthesisCallback
-import android.speech.tts.TextToSpeech
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,30 +21,44 @@ class TerminalityTest {
         private val startCalled = AtomicBoolean(false)
         val terminalCalls = AtomicInteger(0)
         val latch = CountDownLatch(1)
+        private val maxBufferSizeValue = 4096
+        private val hasStartedValue = AtomicBoolean(false)
+        private val hasFinishedValue = AtomicBoolean(false)
 
-        override fun start(maxLengthInBytes: Int) {
+        override fun start(sampleRateInHz: Int, audioFormat: Int, channelCount: Int): Int {
             startCalled.set(true)
+            hasStartedValue.set(true)
+            return 0
         }
 
-        override fun done() {
+        override fun done(): Int {
             if (doneCalled.getAndSet(true)) {
                 throw IllegalStateException("done() called multiple times")
             }
+            hasFinishedValue.set(true)
             terminalCalls.incrementAndGet()
             latch.countDown()
+            return 0
         }
 
-        override fun error(errorCode: Int) {
+        override fun error() {
             if (errorCalled.getAndSet(true)) {
                 throw IllegalStateException("error() called multiple times")
             }
+            hasFinishedValue.set(true)
             terminalCalls.incrementAndGet()
             latch.countDown()
         }
 
-        override fun stop() {}
-        override fun rangeStart(startOffset: Int) {}
-        override fun audioData(data: ByteArray, offset: Int, length: Int) {}
+        override fun audioAvailable(buffer: ByteArray, offset: Int, length: Int): Int {
+            return 0
+        }
+
+        override fun getMaxBufferSize(): Int = maxBufferSizeValue
+
+        override fun hasFinished(): Boolean = hasFinishedValue.get()
+
+        override fun hasStarted(): Boolean = hasStartedValue.get()
 
         fun awaitTerminal(timeout: Long = 5, unit: TimeUnit = TimeUnit.SECONDS): Boolean {
             return latch.await(timeout, unit)
@@ -78,12 +91,12 @@ class TerminalityTest {
     @Test
     fun errorCalledExactlyOnce() {
         val callback = FakeCallback()
-        callback.error(TextToSpeech.ERROR_SYNTHESIS)
+        callback.error()
         assertTrue(callback.isTerminal())
         assertEquals(1, callback.terminalCalls.get())
         // Second call should throw
         try {
-            callback.error(TextToSpeech.ERROR_SYNTHESIS)
+            callback.error()
             throw AssertionError("Expected IllegalStateException")
         } catch (e: IllegalStateException) {
             assertTrue(e.message!!.contains("multiple times"))
@@ -97,7 +110,7 @@ class TerminalityTest {
         assertTrue(callback.isTerminal())
         // Calling error after done should throw
         try {
-            callback.error(TextToSpeech.ERROR_SYNTHESIS)
+            callback.error()
             throw AssertionError("Expected IllegalStateException")
         } catch (e: IllegalStateException) {
             assertTrue(e.message!!.contains("multiple times"))
@@ -107,7 +120,7 @@ class TerminalityTest {
     @Test
     fun errorAndDoneAreMutuallyExclusive() {
         val callback = FakeCallback()
-        callback.error(TextToSpeech.ERROR_SYNTHESIS)
+        callback.error()
         assertTrue(callback.isTerminal())
         // Calling done after error should throw
         try {
@@ -121,7 +134,7 @@ class TerminalityTest {
     @Test
     fun startDoesNotAffectTerminality() {
         val callback = FakeCallback()
-        callback.start(1000)
+        callback.start(24000, 2, 1)
         assertFalse(callback.isTerminal())
         assertEquals(0, callback.terminalCalls.get())
         // Can still call done
@@ -133,7 +146,7 @@ class TerminalityTest {
     @Test
     fun callbackReachesTerminalState() {
         val callback = FakeCallback()
-        callback.start(1000)
+        callback.start(24000, 2, 1)
         callback.done()
         assertTrue(callback.awaitTerminal())
         assertTrue(callback.isTerminal())
@@ -143,8 +156,8 @@ class TerminalityTest {
     @Test
     fun callbackReachesErrorState() {
         val callback = FakeCallback()
-        callback.start(1000)
-        callback.error(TextToSpeech.ERROR_SYNTHESIS)
+        callback.start(24000, 2, 1)
+        callback.error()
         assertTrue(callback.awaitTerminal())
         assertTrue(callback.isTerminal())
         assertTrue(callback.wasStarted())
@@ -153,42 +166,42 @@ class TerminalityTest {
     @Test
     fun terminalGuardPreventsDoubleDone() {
         val callback = FakeCallback()
-        val guard = TerminalGuard(callback)
-        guard.done()
+        val guard = TerminalGuard()
+        guard.done(callback)
         assertTrue(callback.isTerminal())
         // Second call through guard should be no-op
-        guard.done()
+        guard.done(callback)
         assertEquals(1, callback.terminalCalls.get())
     }
 
     @Test
     fun terminalGuardPreventsDoubleError() {
         val callback = FakeCallback()
-        val guard = TerminalGuard(callback)
-        guard.error(TextToSpeech.ERROR_SYNTHESIS)
+        val guard = TerminalGuard()
+        guard.error(callback, "Error message")
         assertTrue(callback.isTerminal())
         // Second call through guard should be no-op
-        guard.error(TextToSpeech.ERROR_SYNTHESIS)
+        guard.error(callback, "Another error")
         assertEquals(1, callback.terminalCalls.get())
     }
 
     @Test
     fun terminalGuardPreventsDoneAfterError() {
         val callback = FakeCallback()
-        val guard = TerminalGuard(callback)
-        guard.error(TextToSpeech.ERROR_SYNTHESIS)
+        val guard = TerminalGuard()
+        guard.error(callback, "Error message")
         // done() through guard should be no-op
-        guard.done()
+        guard.done(callback)
         assertEquals(1, callback.terminalCalls.get())
     }
 
     @Test
     fun terminalGuardPreventsErrorAfterDone() {
         val callback = FakeCallback()
-        val guard = TerminalGuard(callback)
-        guard.done()
+        val guard = TerminalGuard()
+        guard.done(callback)
         // error() through guard should be no-op
-        guard.error(TextToSpeech.ERROR_SYNTHESIS)
+        guard.error(callback, "Error message")
         assertEquals(1, callback.terminalCalls.get())
     }
 }
