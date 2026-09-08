@@ -19,6 +19,7 @@ class TerminalityTest {
         private val doneCalled = AtomicBoolean(false)
         private val errorCalled = AtomicBoolean(false)
         private val startCalled = AtomicBoolean(false)
+        private val terminalCalled = AtomicBoolean(false) // Previene done + error
         val terminalCalls = AtomicInteger(0)
         val latch = CountDownLatch(1)
         private val maxBufferSizeValue = 4096
@@ -32,6 +33,9 @@ class TerminalityTest {
         }
 
         override fun done(): Int {
+            if (!terminalCalled.compareAndSet(false, true)) {
+                throw IllegalStateException("done() called after terminal state")
+            }
             if (doneCalled.getAndSet(true)) {
                 throw IllegalStateException("done() called multiple times")
             }
@@ -42,6 +46,9 @@ class TerminalityTest {
         }
 
         override fun error() {
+            if (!terminalCalled.compareAndSet(false, true)) {
+                throw IllegalStateException("error() called after terminal state")
+            }
             if (errorCalled.getAndSet(true)) {
                 throw IllegalStateException("error() called multiple times")
             }
@@ -51,7 +58,10 @@ class TerminalityTest {
         }
 
         override fun error(errorCode: Int) {
-            // Usar directamente la misma guarda que error() sin cÃ³digo
+            // Usar directamente la misma guarda que error()
+            if (!terminalCalled.compareAndSet(false, true)) {
+                throw IllegalStateException("error() called after terminal state")
+            }
             if (errorCalled.getAndSet(true)) {
                 throw IllegalStateException("error() called multiple times")
             }
@@ -94,7 +104,7 @@ class TerminalityTest {
             callback.done()
             throw AssertionError("Expected IllegalStateException")
         } catch (e: IllegalStateException) {
-            assertTrue(e.message!!.contains("multiple times"))
+            assertTrue(e.message!!.contains("multiple times") || e.message!!.contains("after terminal"))
         }
     }
 
@@ -109,14 +119,14 @@ class TerminalityTest {
             callback.error()
             throw AssertionError("Expected IllegalStateException")
         } catch (e: IllegalStateException) {
-            assertTrue(e.message!!.contains("multiple times"))
+            assertTrue(e.message!!.contains("multiple times") || e.message!!.contains("after terminal"))
         }
     }
 
     @Test
     fun errorWithCodeCalledExactlyOnce() {
         val callback = FakeCallback()
-        callback.error(1) // Con cÃ³digo
+        callback.error(1) // Con código
         assertTrue(callback.isTerminal())
         assertEquals(1, callback.terminalCalls.get())
         // Second call should throw
@@ -124,7 +134,7 @@ class TerminalityTest {
             callback.error(2)
             throw AssertionError("Expected IllegalStateException")
         } catch (e: IllegalStateException) {
-            assertTrue(e.message!!.contains("multiple times"))
+            assertTrue(e.message!!.contains("multiple times") || e.message!!.contains("after terminal"))
         }
     }
 
@@ -138,7 +148,7 @@ class TerminalityTest {
             callback.error()
             throw AssertionError("Expected IllegalStateException")
         } catch (e: IllegalStateException) {
-            assertTrue(e.message!!.contains("multiple times"))
+            assertTrue(e.message!!.contains("after terminal"))
         }
     }
 
@@ -152,7 +162,7 @@ class TerminalityTest {
             callback.done()
             throw AssertionError("Expected IllegalStateException")
         } catch (e: IllegalStateException) {
-            assertTrue(e.message!!.contains("multiple times"))
+            assertTrue(e.message!!.contains("after terminal"))
         }
     }
 
