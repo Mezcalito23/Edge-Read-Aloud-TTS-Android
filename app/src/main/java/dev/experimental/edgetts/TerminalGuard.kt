@@ -1,36 +1,31 @@
 package dev.experimental.edgetts
 
 import android.speech.tts.SynthesisCallback
-import android.speech.tts.TextToSpeech
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Garantiza exactamente una llamada terminal (done XOR error) a SynthesisCallback.
- * Todas las llamadas posteriores son no-op.
- * Las excepciones del callback se capturan y no escapan.
+ * Garantiza una ÃNICA llamada terminal (done XOR error). El resto del
+ * servicio puede llamar done/error con libertad: solo la primera surte
+ * efecto, como exige el contrato de SynthesisCallback.
  */
-class TerminalGuard(
-    private val callback: SynthesisCallback
-) {
+class TerminalGuard {
     private val fired = AtomicBoolean(false)
-    val isFired: Boolean get() = fired.get()
 
-    /**
-     * Llama callback.done() solo si es la primera terminaciÃ³n.
-     */
-    fun done() {
-        if (fired.compareAndSet(false, true)) {
-            runCatching { callback.done() }
-        }
+    val isFired: Boolean
+        get() = fired.get()
+
+    fun done(callback: SynthesisCallback) {
+        if (fired.compareAndSet(false, true)) runCatching { callback.done() }
     }
 
-    /**
-     * Llama callback.error(errorCode) solo si es la primera terminaciÃ³n.
-     * Usa TextToSpeech.ERROR_SYNTHESIS por defecto si no se especifica.
-     */
-    fun error(errorCode: Int = TextToSpeech.ERROR_SYNTHESIS) {
+    fun error(
+        callback: SynthesisCallback,
+        message: String,
+        persist: ((String) -> Unit)? = null
+    ) {
         if (fired.compareAndSet(false, true)) {
-            runCatching { callback.error(errorCode) }
+            persist?.invoke(message)
+            runCatching { callback.error() }
         }
     }
 }
