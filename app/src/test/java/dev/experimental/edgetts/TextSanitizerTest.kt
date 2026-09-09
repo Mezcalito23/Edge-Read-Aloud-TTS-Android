@@ -16,7 +16,7 @@ class TextSanitizerTest {
     @Test
     fun removesControlCharacters00to08() {
         val input = "\u0000Hello\u0001\u0002World\u0008"
-        val expected = "        Hello   World "
+        val expected = " Hello  World "  // 1 espacio, Hello, 2 espacios, World, 1 espacio
         assertEquals(expected, TextSanitizer.removeIncompatibleCharacters(input))
     }
 
@@ -30,7 +30,7 @@ class TextSanitizerTest {
     @Test
     fun removesControlCharacters0Eto1F() {
         val input = "Text\u000E\u000F\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001FMore"
-        val expected = "Text                  More"
+        val expected = "Text                  More"  // 18 espacios entre Text y More
         assertEquals(expected, TextSanitizer.removeIncompatibleCharacters(input))
     }
 
@@ -56,7 +56,7 @@ class TextSanitizerTest {
     @Test
     fun normalizeSpacesHandlesTabsAndNewlines() {
         val input = "Line1\t\t\n\nLine2   with   spaces"
-        val expected = "Line1  Line2 with spaces"
+        val expected = "Line1  Line2 with spaces"  // 2 tabs → 2 espacios, \n\n → se elimina
         assertEquals(expected, TextSanitizer.normalizeSpaces(input))
     }
 
