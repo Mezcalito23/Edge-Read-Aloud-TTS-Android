@@ -26,36 +26,23 @@ object TextSegmenter {
      * @return Lista de segmentos, cada uno <= MAX_SEGMENT_BYTES bytes UTF-8
      */
     fun segment(text: String, isCancelled: () -> Boolean = { false }): List<String> {
-        val result = mutableListOf<String>()
-
-        // Primero separar por p\u00e1rrafos (doble salto de l\u00ednea)
-        val paragraphs = text.split("\n\n")
-
-        for (paragraph in paragraphs) {
-            if (isCancelled()) break
-
-            val paragraphTrimmed = paragraph.trim()
-            if (paragraphTrimmed.isBlank()) continue
-
-            // Si el p\u00e1rrafo cabe en un segmento, a\u00f1adirlo directamente
-            val paragraphBytes = paragraphTrimmed.toByteArray(Charsets.UTF_8)
-            if (paragraphBytes.size <= MAX_SEGMENT_BYTES) {
-                result.add(paragraphTrimmed)
-            } else {
-                // Si excede el l\u00edmite, aplicar segmentaci\u00f3n por bytes
-                result.addAll(segmentByBytes(paragraphTrimmed, isCancelled))
-            }
+        // Si el texto cabe en un segmento, devolverlo directamente
+        val utf8Bytes = text.toByteArray(Charsets.UTF_8)
+        if (utf8Bytes.size <= MAX_SEGMENT_BYTES) {
+            return listOf(text.trim())
         }
 
-        return result
+        // Texto largo - aplicar segmentaci\u00f3n por bytes
+        return segmentByBytes(text, isCancelled)
     }
 
     /**
      * Segmenta un texto por bytes UTF-8 cuando excede MAX_SEGMENT_BYTES.
      * Estrategia de divisi\u00f3n (prioridad):
-     * 1. Saltos de l\u00ednea simples
-     * 2. Espacios (palabras)
-     * 3. L\u00edmite duro (sin partir caracteres multi-byte)
+     * 1. Doble salto de l\u00ednea (p\u00e1rrafo)
+     * 2. Salto de l\u00ednea simple
+     * 3. Espacio (palabra)
+     * 4. L\u00edmite duro (sin partir caracteres multi-byte)
      */
     private fun segmentByBytes(text: String, isCancelled: () -> Boolean): List<String> {
         val result = mutableListOf<String>()
@@ -92,26 +79,33 @@ object TextSegmenter {
 
     /**
      * Busca el mejor punto de divisi\u00f3n dentro del rango [start, end).
-     * Prioridad: 1. Salto de l\u00ednea simple, 2. Espacio (palabra), 3. L\u00edmite duro
+     * Prioridad: 1. Doble salto de l\u00ednea (p\u00e1rrafo), 2. Salto de l\u00ednea, 3. Espacio, 4. L\u00edmite duro
      */
     private fun findSmartSplitPoint(bytes: ByteArray, start: Int, end: Int): Int {
         // Buscar desde el final hacia el inicio (preferir divisi\u00f3n tard\u00eda)
 
-        // 1. Buscar salto de l\u00ednea simple
+        // 1. Buscar doble salto de l\u00ednea (\n\n)
+        for (i in end - 1 downTo start + 1) {
+            if (bytes[i].toInt() == 0x0A && bytes[i - 1].toInt() == 0x0A) { // '\n\n'
+                return i + 1 // Incluir el segundo salto de l\u00ednea en el segmento anterior
+            }
+        }
+
+        // 2. Buscar salto de l\u00ednea simple
         for (i in end - 1 downTo start) {
             if (bytes[i].toInt() == 0x0A) { // '\n'
                 return i + 1 // Incluir el salto de l\u00ednea en el segmento anterior
             }
         }
 
-        // 2. Buscar espacio (palabra)
+        // 3. Buscar espacio (palabra)
         for (i in end - 1 downTo start) {
             if (bytes[i].toInt() == 0x20) { // ' '
                 return i + 1 // Incluir el espacio en el segmento anterior
             }
         }
 
-        // 3. L\u00edmite duro - asegurar que no partimos un car\u00e1cter multi-byte
+        // 4. L\u00edmite duro - asegurar que no partimos un car\u00e1cter multi-byte
         return findUtf8SafeBoundary(bytes, start, end)
     }
 
