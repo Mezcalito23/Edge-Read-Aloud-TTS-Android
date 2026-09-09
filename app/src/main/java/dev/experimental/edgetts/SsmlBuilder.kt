@@ -4,12 +4,12 @@ package dev.experimental.edgetts
  * Genera el SSML con el formato EXACTO del cliente de referencia
  * (rany2/edge-tts, mkssml + TTSConfig), verificado en vivo:
  *
- * - el nombre de voz va en formato LARGO: el cliente expande
- * "es-MX-DaliaNeural" a "Microsoft Server Speech Text to Speech Voice
- * (es-MX, DaliaNeural)" (data_classes.py); el servidor espera eso;
- * - atributos con comillas simples, xmlns de síntesis y xml:lang='en-US'
- * fijo (quirk del cliente original; el idioma real lo marca el voice name);
- * - prosody con pitch, rate y volume en ese orden.
+ *  - el nombre de voz va en formato LARGO: el cliente expande
+ *    "es-MX-DaliaNeural" a "Microsoft Server Speech Text to Speech Voice
+ *    (es-MX, DaliaNeural)" (data_classes.py); el servidor espera eso;
+ *  - atributos con comillas simples, xmlns de síntesis y xml:lang='en-US'
+ *    fijo (quirk del cliente original; el idioma real lo marca el voice name);
+ *  - prosody con pitch, rate y volume en ese orden.
  *
  * Si el servidor rechazara SSML extendido, [build] con `minimal = true`
  * emite únicamente speak + voice + texto.
@@ -32,9 +32,10 @@ object SsmlBuilder {
 
     /**
      * "+0%", "+25%", "-10%"… recortado al rango que el servicio permite:
-     * -50%..+50% (lí±±mite superior e inferior coinciden con el protocolo).
+     * -50%..+100% (el extremo superior honra el slider del sistema a 2.0x;
+     * el extremo inferior coincide con el mínimo del protocolo).
      */
-    fun signedPercent(percent: Int): String = signed(percent.coerceIn(-50, 50), "%")
+    fun signedPercent(percent: Int): String = signed(percent.coerceIn(-50, 100), "%")
 
     /** "+0Hz", "-4Hz"… recortado al rango ±50. */
     fun signedHertz(hertz: Int): String = signed(hertz.coerceIn(-50, 50), "Hz")
@@ -46,8 +47,8 @@ object SsmlBuilder {
      * Expande el nombre corto al formato largo que usa Microsoft Edge,
      * igual que TTSConfig.__post_init__ de la referencia:
      *
-     * es-MX-DaliaNeural →
-     * Microsoft Server Speech Text to Speech Voice (es-MX, DaliaNeural)
+     *   es-MX-DaliaNeural →
+     *   Microsoft Server Speech Text to Speech Voice (es-MX, DaliaNeural)
      *
      * También maneja variantes regionales compuestas
      * (zh-CN-shandong-YunxiangNeural → (zh-CN-shandong, YunxiangNeural)).
@@ -82,15 +83,16 @@ object SsmlBuilder {
         minimal: Boolean = false
     ): String = buildString {
         append("<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>")
-        append("<voice name='${voiceLongName(voice)}'>")
+        append("<voice name='").append(escapeXml(voiceLongName(voice))).append("'>")
         if (minimal) {
             append(escapeXml(text))
         } else {
-            append("<prosody pitch='$pitch' rate='$rate' volume='+0%'>")
+            append("<prosody pitch='").append(escapeXml(pitch))
+            append("' rate='").append(escapeXml(rate))
+            append("' volume='+0%'>")
             append(escapeXml(text))
             append("</prosody>")
         }
-        append("</voice>")
-        append("</speak>")
+        append("</voice></speak>")
     }
 }
