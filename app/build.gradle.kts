@@ -65,9 +65,13 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("androidx.datastore:datastore-preferences:1.2.1")
 
+    // org.json está incluido en Android SDK, pero para tests JVM necesitamos la librería externa
+    testImplementation("org.json:json:20231013")
+
     // Pruebas unitarias (JVM) e instrumentadas (dispositivo/emulador).
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
 }
+
