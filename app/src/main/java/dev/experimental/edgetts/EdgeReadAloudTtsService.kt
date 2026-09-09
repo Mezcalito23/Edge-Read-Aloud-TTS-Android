@@ -19,17 +19,17 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Microsoft Edge Read Aloud.
  *
  * Contrato garantizado:
- *  - done() XOR error(), exactamente una vez por sÃ©ntesis;
- *  - ninguna excepciÃ³n escapa del servicio (la app cliente nunca crashea);
- *  - onStop() cancela la sÃ©ntesis activa;
+ *  - done() XOR error(), exactamente una vez por síntesis;
+ *  - ninguna excepción escapa del servicio (la app cliente nunca crashea);
+ *  - onStop() cancela la síntesis activa;
  *  - el audio se entrega SIEMPRE como PCM 16-bit (el MP3 de Edge se
  *    decodifica con MediaCodec ANTES de tocar SynthesisCallback).
  *
  * Modelo de voces (como Google TTS): se expone UNA voz por idioma. Para el
- * idioma de la voz configurada en la app (espaÃ±ol, Dalia por defecto) esa es
- * la voz expuesta; cambiarla en la app cambia la voz del espaÃ±ol en TODO el
- * sistema. Para otros idiomas se expone una voz representativa del catÃ¡logo
- * y se resuelve automÃ¡ticamente segÃºn el idioma del contenido.
+ * idioma de la voz configurada en la app (español, Dalia por defecto) esa es
+ * la voz expuesta; cambiarla en la app cambia la voz del español en TODO el
+ * sistema. Para otros idiomas se expone una voz representativa del catálogo
+ * y se resuelve automáticamente según el idioma del contenido.
  */
 class EdgeReadAloudTtsService : TextToSpeechService() {
 
@@ -49,7 +49,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
     // Idioma cargado por el cliente (setLanguage). Se inicializa con el
     // idioma del SISTEMA para que el TTS por defecto siga al dispositivo
-    // (inglÃ©s en un equipo inglÃ©s, francÃ©s en uno francÃ©s, etc.) â como
+    // (inglés en un equipo inglés, francés en uno francés, etc.) — como
     // hace Google TTS.
     @Volatile
     private var currentLanguage: Array<String> = arrayOf("es", "MX", "")
@@ -68,8 +68,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         catalog = VoiceCatalogRepository(client, app.cacheDir)
         cache = CacheRepository(app.cacheDir)
 
-        // Idioma inicial: el del dispositivo, si el catÃ¡logo lo cubre;
-        // si no, espaÃ±ol de MÃ©xico. AsÃ© el "idioma predeterminado" del motor
+        // Idioma inicial: el del dispositivo, si el catálogo lo cubre;
+        // si no, español de México. Así el "idioma predeterminado" del motor
         // coincide con el sistema desde el primer momento.
         runCatching {
             val dev = Locale.getDefault()
@@ -84,23 +84,23 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         super.onDestroy()
     }
 
-    // ââ¬¤ Idioma y voces ââ¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤
+    // ── Idioma y voces ──────────────────────────────────────────────────────
 
-    // CachÃ© por proceso de los locales soportados, en DOBLE formato (ISO2 e
+    // Caché por proceso de los locales soportados, en DOBLE formato (ISO2 e
     // ISO3). onIsLanguageAvailable se invoca cientos de veces al abrir los
-    // ajustes del sistema, asÃ© que no se relee el JSON en cada llamada. Solo
-    // se cachea cuando hay datos: si el catÃ¡logo aÃºn no existe, se reintenta.
+    // ajustes del sistema, así que no se relee el JSON en cada llamada. Solo
+    // se cachea cuando hay datos: si el catálogo aún no existe, se reintenta.
     //
-    // La negociaciÃ³n compara en ambos formatos como seguro: en algunos
-    // dispositivos la comparaciÃ³n ISO3 fallaba por un quirk de ICU (la
-    // consulta se normalizaba bien pero el set no contenÃ©a la entrada) y
-    // TODO respondÃ©a LANG_AVAILABLE en vez de LANG_COUNTRY_AVAILABLE. Con
-    // doble formato, la coincidencia exacta de paÃ©s siempre prende.
+    // La negociación compara en ambos formatos como seguro: en algunos
+    // dispositivos la comparación ISO3 fallaba por un quirk de ICU (la
+    // consulta se normalizaba bien pero el set no contenía la entrada) y
+    // TODO respondía LANG_AVAILABLE en vez de LANG_COUNTRY_AVAILABLE. Con
+    // doble formato, la coincidencia exacta de país siempre prende.
     private data class LocaleSets(
-        val fullIso2: Set<String>,   // "es-mx", "en-us", â
-        val langsIso2: Set<String>,  // "es", "en", â
-        val fullIso3: Set<String>,   // "spa-mex", "eng-usa", â
-        val langsIso3: Set<String>   // "spa", "eng", â
+        val fullIso2: Set<String>,   // "es-mx", "en-us", …
+        val langsIso2: Set<String>,  // "es", "en", …
+        val fullIso3: Set<String>,   // "spa-mex", "eng-usa", …
+        val langsIso3: Set<String>   // "spa", "eng", …
     )
 
     @Volatile
@@ -122,7 +122,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     }
 
     /**
-     * Normaliza un locale ("es-mx", "es-MX", "spa-mex"â¬¤) a ISO3 minÃºsculo
+     * Normaliza un locale ("es-mx", "es-MX", "spa-mex"…) a ISO3 minúsculo
      * ("spa-mex"). Usa Locale.isO3Language/isO3Country, que aceptan tanto ISO2
      * como ISO3 y devuelven siempre ISO3. Devuelve null si el idioma no se
      * puede resolver.
@@ -144,33 +144,33 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         return "$lang3-$country3"
     }
 
-    // ââ¬¤ Voces expuestas: TODO el catÃ¡logo ââ¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤
-    // Se exponen las ~322 voces del catÃ¡logo, cada una con SU locale real.
-    // Es imprescindible para la integraciÃ³n con el sistema: el framework
+    // ── Voces expuestas: TODO el catálogo ────────────────────────────────────
+    // Se exponen las ~322 voces del catálogo, cada una con SU locale real.
+    // Es imprescindible para la integración con el sistema: el framework
     // resuelve setVoice()/setLanguage() buscando la voz en onGetVoices()
-    // (findVoice); si la voz pedida no estÃ¡ expuesta, la peticiÃ³n se descarta
-    // en silencio y el motor sintetiza con la voz anterior âexactamente el
+    // (findVoice); si la voz pedida no está expuesta, la petición se descarta
+    // en silencio y el motor sintetiza con la voz anterior —exactamente el
     // fallo de "algunos idiomas funcionan y otros no".
     //
-    // La selecciÃ³n de la app sigue aplicando a todo el sistema vÃ©a
+    // La selección de la app sigue aplicando a todo el sistema vía
     // onGetDefaultVoiceNameFor (para su idioma, la voz configurada); la
-    // lista de IDIOMAS de Ajustes sale de CheckVoiceData (canÃ³nica y
-    // estable), NO de esta lista, asÃ© que el selector de idiomas no se
-    // ve afectado por exponer el catÃ¡logo completo.
+    // lista de IDIOMAS de Ajustes sale de CheckVoiceData (canónica y
+    // estable), NO de esta lista, así que el selector de idiomas no se
+    // ve afectado por exponer el catálogo completo.
 
     /**
-     * Resuelve la voz para un idioma (y paÃ©s opcional). Compara en ISO3
+     * Resuelve la voz para un idioma (y país opcional). Compara en ISO3
      * (robusto a entradas ISO2 o ISO3). Prioridad:
-     *  1. Si se especifica un PAÃ¬S y el catÃ¡logo tiene una voz para ese paÃ©s,
-     *     se respeta el paÃ©s (el Settings manda sobre la variante). Esto hace
-     *     que "EspaÃ±ol (Nicaragua)" en Ajustes suene con voz nicaragÃ¼ense y
-     *     no con la voz mexicana configurada âera la queja principalâ¬¤.
-     *     ExcepciÃ³n: si la voz configurada en la app es de ESE mismo paÃ©s, se
-     *     usa la configurada (respeta la elecciÃ³n del usuario).
-     *  2. Sin paÃ©s (o paÃ©s sin voz en catÃ¡logo): si la voz configurada es de
+     *  1. Si se especifica un PAÍS y el catálogo tiene una voz para ese país,
+     *     se respeta el país (el Settings manda sobre la variante). Esto hace
+     *     que "Español (Nicaragua)" en Ajustes suene con voz nicaragüense y
+     *     no con la voz mexicana configurada —era la queja principal—.
+     *     Excepción: si la voz configurada en la app es de ESE mismo país, se
+     *     usa la configurada (respeta la elección del usuario).
+     *  2. Sin país (o país sin voz en catálogo): si la voz configurada es de
      *     este idioma, se usa (modelo de la app: la voz elegida aplica al
      *     sistema para su idioma).
-     *  3. Primera voz del idioma en el catÃ¡logo.
+     *  3. Primera voz del idioma en el catálogo.
      */
     private fun voiceForLanguage(lang: String, country: String = ""): String? {
         val l3 = normLang(lang)
@@ -181,7 +181,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val catalogVoices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
         val c3 = normCountry(country)
 
-        // 1) PaÃ©s especificado con voz en el catÃ¡logo â respetar el paÃ©s.
+        // 1) País especificado con voz en el catálogo → respetar el país.
         if (c3.isNotEmpty()) {
             val countryVoice = catalogVoices.firstOrNull {
                 normLang(it.locale.substringBefore("-")) == l3 &&
@@ -205,23 +205,23 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }?.shortName
     }
 
-    // ââ¬¤ Resiliencia a cambios del catÃ¡logo de Microsoft ââ¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤
+    // ── Resiliencia a cambios del catálogo de Microsoft ─────────────────────
     // Microsoft puede RETIRAR o AGREGAR voces del servicio en cualquier
     // momento. Si la app o un cliente piden una voz que ya no existe, enviar
     // su nombre a Edge hace que el servidor cierre el turno SIN audio (error
     // confuso). validatedVoice() garantiza que solo se sintetice con voces
-    // presentes en el catÃ¡logo descargado, con un respaldo razonable.
+    // presentes en el catálogo descargado, con un respaldo razonable.
 
-    /** Nombres de voz presentes en el catÃ¡logo (vacÃ©o si aÃºn no se descarga). */
+    /** Nombres de voz presentes en el catálogo (vacío si aún no se descarga). */
     private fun catalogShortNames(): Set<String> =
         runCatching { catalog?.cached() }.getOrNull().orEmpty()
             .map { it.shortName }.toSet()
 
     /**
-     * Si [voice] existe en el catÃ¡logo se devuelve tal cual; si no (voz
-     * retirada por Microsoft o catÃ¡logo desactualizado) se busca un respaldo:
+     * Si [voice] existe en el catálogo se devuelve tal cual; si no (voz
+     * retirada por Microsoft o catálogo desactualizado) se busca un respaldo:
      * primero una voz del MISMO idioma, luego la voz configurada, luego Dalia.
-     * Sin catÃ¡logo descargado se confÃ©a en el nombre pedido (no hay con quÃ©
+     * Sin catálogo descargado se confía en el nombre pedido (no hay con qué
      * validar).
      */
     private fun validatedVoice(voice: String): String {
@@ -233,7 +233,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val byLang = runCatching { catalog?.cached() }.getOrNull().orEmpty()
             .firstOrNull { it.locale.substringBefore("-").lowercase(Locale.ROOT) == lang }
         if (byLang != null) {
-            Log.w(TAG, "La voz '$voice' ya no estÃ¡ en el catÃ¡logo; usando ${byLang.shortName}")
+            Log.w(TAG, "La voz '$voice' ya no está en el catálogo; usando ${byLang.shortName}")
             return byLang.shortName
         }
 
@@ -242,17 +242,17 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         return if (configured in names) configured else EdgeProtocolConstants.DEFAULT_VOICE
     }
 
-    // ââ¬¤ NormalizaciÃ³n ISO3 ââ¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤
+    // ── Normalización ISO3 ──────────────────────────────────────────────────
     // Los clientes pueden negociar con ISO2 ("es"/"MX") o con ISO3
     // ("spa"/"MEX"). Locale.isO3Language/isO3Country acepta AMBOS formatos y
-    // devuelve siempre ISO3, asÃ© que normalizamos la consulta a ISO3 y
-    // comparamos contra los sets ISO3 del catÃ¡logo. Es robusto sin depender de
-    // mapas ISO3â¬¤ISO2 que pueden fallar en algunos dispositivos (Onyx/HarmonyOS).
+    // devuelve siempre ISO3, así que normalizamos la consulta a ISO3 y
+    // comparamos contra los sets ISO3 del catálogo. Es robusto sin depender de
+    // mapas ISO3→ISO2 que pueden fallar en algunos dispositivos (Onyx/HarmonyOS).
 
     /**
-    * Normaliza un cÃ³digo de idioma a ISO3 minÃºsculo ("spa", "eng").
-    * Acepta ISO2 ("es") o ISO3 ("spa"). Los cÃ³digos de 3 letras YA son
-    * ISO3: no se convierten (hacerlo con forLanguageTag fallarÃ©a).
+    * Normaliza un código de idioma a ISO3 minúsculo ("spa", "eng").
+    * Acepta ISO2 ("es") o ISO3 ("spa"). Los códigos de 3 letras YA son
+    * ISO3: no se convierten (hacerlo con forLanguageTag fallaría).
     */
     private fun normLang(code: String): String {
         val c = code.trim().lowercase(Locale.ROOT)
@@ -260,15 +260,15 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         if (c.length == 3) return c                       // ya es ISO3
         return runCatching {
             Locale.forLanguageTag(c).isO3Language.lowercase(Locale.ROOT)
-        }.getOrDefault(c)                                  // ISO2 â ISO3
+        }.getOrDefault(c)                                  // ISO2 → ISO3
     }
 
     /**
-     * Normaliza un cÃ³digo de paÃ©s a ISO3 minÃºsculo ("mex", "usa").
-     * Acepta ISO2 ("MX") o ISO3 ("MEX"). IMPORTANTE: los cÃ³digos de 3
+     * Normaliza un código de país a ISO3 minúsculo ("mex", "usa").
+     * Acepta ISO2 ("MX") o ISO3 ("MEX"). IMPORTANTE: los códigos de 3
      * letras YA son ISO3 y se devuelven tal cual, porque BCP-47 (el formato
-     * de forLanguageTag) NO acepta regiones alfa-3 â pasar "MEX" por
-     * forLanguageTag da paÃ©s vacÃ©o (era el bug que deshabilitaba los
+     * de forLanguageTag) NO acepta regiones alfa-3 — pasar "MEX" por
+     * forLanguageTag da país vacío (era el bug que deshabilitaba los
      * controles de Ajustes).
      */
     private fun normCountry(code: String): String {
@@ -278,11 +278,11 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         return runCatching {
             Locale.forLanguageTag("und-${c.uppercase(Locale.ROOT)}")
                 .isO3Country.lowercase(Locale.ROOT)
-        }.getOrDefault(c)                                  // ISO2 â ISO3
+        }.getOrDefault(c)                                  // ISO2 → ISO3
     }
 
-    // CachÃ©s ISO3â¬¤ISO2. Locale("spa").language devuelve "spa" (NO "es"), asÃ©
-    // que la ÃNICA forma fiable de obtener el ISO2 es buscarlo en las tablas
+    // Cachés ISO3→ISO2. Locale("spa").language devuelve "spa" (NO "es"), así
+    // que la única forma fiable de obtener el ISO2 es buscarlo en las tablas
     // de Locale. Se cachean porque languageAvailability se llama cientos de
     // veces al abrir los Ajustes.
     @Volatile
@@ -291,7 +291,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     @Volatile
     private var iso3To2CountryCache: Map<String, String>? = null
 
-    /** Convierte un cÃ³digo ISO3 de idioma ("spa") a ISO2 ("es"). */
+    /** Convierte un código ISO3 de idioma ("spa") a ISO2 ("es"). */
     private fun iso3ToIso2Lang(code3: String): String {
         val map = iso3To2LangCache ?: run {
             val m = HashMap<String, String>()
@@ -305,7 +305,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         return map[code3.lowercase(Locale.ROOT)] ?: code3.lowercase(Locale.ROOT)
     }
 
-    /** Convierte un cÃ³digo ISO3 de paÃ©s ("mex") a ISO2 ("mx"). */
+    /** Convierte un código ISO3 de país ("mex") a ISO2 ("mx"). */
     private fun iso3ToIso2Country(code3: String): String {
         val map = iso3To2CountryCache ?: run {
             val m = HashMap<String, String>()
@@ -320,24 +320,24 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     }
 
     /**
-     * NegociaciÃ³n de idioma derivada del catÃ¡logo de voces, comparando en ISO3
+     * Negociación de idioma derivada del catálogo de voces, comparando en ISO3
      * (robusto a consultas ISO2 o ISO3):
-     *  - locale exacto (lang+country) presente â LANG_COUNTRY_AVAILABLE (2),
+     *  - locale exacto (lang+country) presente → LANG_COUNTRY_AVAILABLE (2),
      *    que es lo que exigen los ajustes de Android para habilitar los
      *    controles de velocidad/tono/reproducir (Hardy);
-     *  - solo el idioma presente â LANG_AVAILABLE (1);
-     *  - nada â LANG_NOT_SUPPORTED.
-     * Al cubrir los ~75 idiomas del catÃ¡logo, el selector del sistema casi
+     *  - solo el idioma presente → LANG_AVAILABLE (1);
+     *  - nada → LANG_NOT_SUPPORTED.
+     * Al cubrir los ~75 idiomas del catálogo, el selector del sistema casi
      * nunca muestra "idioma no soportado".
      */
     private fun languageAvailability(lang: String, country: String): Int {
         val sets = supportedLocaleSets()
         val l3 = normLang(lang)
         val c3 = normCountry(country)
-        // ISO2 derivados de los ISO3 con una conversiÃ³n REAL (Locale("spa")
-        // .language devuelve "spa", no "es", asÃ© que usamos las tablas de
+        // ISO2 derivados de los ISO3 con una conversión REAL (Locale("spa")
+        // .language devuelve "spa", no "es", así que usamos las tablas de
         // Locale). Doble formato como seguro ante quirks de ICU: la
-        // coincidencia exacta de paÃ©s prende LANG_COUNTRY_AVAILABLE (2).
+        // coincidencia exacta de país prende LANG_COUNTRY_AVAILABLE (2).
         val l2 = if (l3.isNotEmpty()) iso3ToIso2Lang(l3) else ""
         val c2 = if (c3.isNotEmpty()) iso3ToIso2Country(c3) else ""
 
@@ -351,40 +351,40 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             else -> TextToSpeech.LANG_NOT_SUPPORTED
         }
 
-        // DiagnÃ³stico INCONDICIONAL (Hardy): muestra la consulta, la
-        // normalizaciÃ³n y el resultado, para detectar cualquier fallo de
-        // negociaciÃ³n en la prÃ³xima captura de logcat.
+        // Diagnóstico INCONDICIONAL (Hardy): muestra la consulta, la
+        // normalización y el resultado, para detectar cualquier fallo de
+        // negociación en la próxima captura de logcat.
         Log.d(
             TAG,
-            "languageAvailability($lang,$country) â $result " +
-                "(iso3=$l3-$c3 Â iso2=$l2-$c2 Â catÃ¡logo=${sets.fullIso3.size})"
+            "languageAvailability($lang,$country) → $result " +
+                "(iso3=$l3-$c3 · iso2=$l2-$c2 · catálogo=${sets.fullIso3.size})"
         )
         return result
     }
 
-    /** El contrato del motor devuelve cÃ³digos ISO3 ("spa", "MEX", variante). */
+    /** El contrato del motor devuelve códigos ISO3 ("spa", "MEX", variante). */
     override fun onGetLanguage(): Array<String> {
         val cur = currentLanguage
         // IMPORTANTE: usar normLang/normCountry (que aceptan ISO2 e ISO3) en
         // lugar de forLanguageTag. forLanguageTag("spa-MEX") descarta "MEX"
-        // porque en BCP-47 una regiÃ³n alfa-3 es invÃ¡lida, y perderÃ©amos el
-        // paÃ©s (devolverÃ©a ["spa","",""]).
+        // porque en BCP-47 una región alfa-3 es inválida, y perderíamos el
+        // país (devolvería ["spa","",""]).
         val l3 = normLang(cur.getOrElse(0) { "" })        // "spa"
         val c3 = normCountry(cur.getOrElse(1) { "" })     // "mex"
         val result = arrayOf(
             l3,
-            c3.uppercase(Locale.ROOT),   // "MEX" â mismo caso que Locale.isO3Country
+            c3.uppercase(Locale.ROOT),   // "MEX" — mismo caso que Locale.isO3Country
             cur.getOrElse(2) { "" }
         )
-        Log.d(TAG, "onGetLanguage â ${result.joinToString(",")}")
+        Log.d(TAG, "onGetLanguage → ${result.joinToString(",")}")
         return result
     }
 
     override fun onIsLanguageAvailable(lang: String, country: String, variant: String): Int {
         val code = languageAvailability(lang, country)
-        // DiagnÃ³stico: permite ver en logcat quÃ© consulta hace la sonda de
-        // Ajustes y quÃ© respondemos (para depurar los controles deshabilitados).
-        Log.d(TAG, "onIsLanguageAvailable($lang,$country,$variant) â $code")
+        // Diagnóstico: permite ver en logcat qué consulta hace la sonda de
+        // Ajustes y qué respondemos (para depurar los controles deshabilitados).
+        Log.d(TAG, "onIsLanguageAvailable($lang,$country,$variant) → $code")
         return code
     }
 
@@ -393,30 +393,30 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         if (code >= TextToSpeech.LANG_AVAILABLE) {
             currentLanguage = arrayOf(lang, country, variant)
         }
-        Log.d(TAG, "onLoadLanguage($lang,$country,$variant) â $code")
+        Log.d(TAG, "onLoadLanguage($lang,$country,$variant) → $code")
         return code
     }
 
     /**
-     * ResoluciÃ³n por defecto de voz para un locale â la ÃNICA fuente de
+     * Resolución por defecto de voz para un locale — la ÚNICA fuente de
      * verdad que comparten onGetDefaultVoiceNameFor() y resolveVoice(). Si
-     * divergieran, el sistema prometerÃ©a una voz (vÃ©a onGetDefaultVoiceNameFor)
-     * y la sÃ©ntesis usarÃ©a otra cuando voiceName llega vacÃ©o.
+     * divergieran, el sistema prometería una voz (vía onGetDefaultVoiceNameFor)
+     * y la síntesis usaría otra cuando voiceName llega vacío.
      *
-     * MODELO 1 â LA VOZ DE LA APP MANDA (verificado en AOSP: desde API 21,
+     * MODELO 1 — LA VOZ DE LA APP MANDA (verificado en AOSP: desde API 21,
      * TextToSpeech.setLanguage se implementa llamando a setVoice con la voz
      * que devuelva onGetDefaultVoiceNameFor; el control del mapeo
-     * localeâ¬¤voz lo tiene el motor, NO el sistema):
+     * locale→voz lo tiene el motor, NO el sistema):
      *  - Con el modo unificado activo (por defecto), si el idioma pedido
      *    coincide con el de la voz configurada en la app, se devuelve ESA voz
-     *    para cualquier variante del idioma (es-MX, es-PE, es-419, en-USâ¬¤).
-     *    AsÃ© la selecciÃ³n de la app se aplica a Play Books, Neo Reader y al
-     *    sistema entero para su idioma. Resuelve tambiÃ©n es-419 (no hay voz
+     *    para cualquier variante del idioma (es-MX, es-PE, es-419, en-US…).
+     *    Así la selección de la app se aplica a Play Books, Neo Reader y al
+     *    sistema entero para su idioma. Resuelve también es-419 (no hay voz
      *    Edge para ese locale; cae limpio en la voz configurada).
-     *  - Con el modo unificado apagado, se restaura la prioridad por paÃ©s de
-     *    la v18 (cada variante con su voz regional) vÃ©a voiceForLanguage.
+     *  - Con el modo unificado apagado, se restaura la prioridad por país de
+     *    la v18 (cada variante con su voz regional) vía voiceForLanguage.
      *  - Para OTROS idiomas (distintos del configurado), siempre la voz del
-     *    catÃ¡logo (con prioridad de paÃ©s si existe).
+     *    catálogo (con prioridad de país si existe).
      */
     private fun resolveDefaultVoiceFor(
         lang: String,
@@ -431,10 +431,10 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         if (snap.unifiedVoiceMode) {
             // La voz de la app manda para su idioma.
             if (configuredLang == requestedLang) return validatedVoice(configuredName)
-            // Libro en espaÃ±ol pero la voz configurada es de OTRO idioma: usar
-            // la Ãltima voz de espaÃ±ol elegida en la app (reconocible, p. ej.
-            // la mexicana), no una variante arbitraria del catÃ¡logo que suene
-            // a un espaÃ±ol que el usuario no reconoce (era la queja reportada).
+            // Libro en español pero la voz configurada es de OTRO idioma: usar
+            // la última voz de español elegida en la app (reconocible, p. ej.
+            // la mexicana), no una variante arbitraria del catálogo que suene
+            // a un español que el usuario no reconoce (era la queja reportada).
             if (requestedLang == "spa") {
                 return validatedVoice(
                     snap.lastSpanishVoice.ifBlank { EdgeProtocolConstants.DEFAULT_VOICE }
@@ -445,10 +445,10 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     }
 
     /**
-     * PIEZA CLAVE para la integraciÃ³n con el sistema: cuando una app llama a
+     * PIEZA CLAVE para la integración con el sistema: cuando una app llama a
      * setLanguage() sin especificar voz, TextToSpeechService consulta este
-     * mÃ©todo; si devuelve null, setLanguage FALLA y la app hace fallback a
-     * otro motor. Delega en resolveDefaultVoiceFor (fuente de verdad Ãnica).
+     * método; si devuelve null, setLanguage FALLA y la app hace fallback a
+     * otro motor. Delega en resolveDefaultVoiceFor (fuente de verdad única).
      */
     override fun onGetDefaultVoiceNameFor(
         lang: String,
@@ -456,13 +456,13 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         variant: String
     ): String? {
         if (normLang(lang).isEmpty()) {
-            Log.d(TAG, "onGetDefaultVoiceNameFor($lang,$country,$variant) â null (idioma vacÃ©o)")
+            Log.d(TAG, "onGetDefaultVoiceNameFor($lang,$country,$variant) → null (idioma vacío)")
             return null
         }
         val snap = settings?.snapshotBlocking()
             ?: return voiceForLanguage(lang, country)
         val resolved = resolveDefaultVoiceFor(lang, country, snap)
-        Log.d(TAG, "onGetDefaultVoiceNameFor($lang,$country,$variant) â ${resolved ?: "null"} (unificado=${snap.unifiedVoiceMode})")
+        Log.d(TAG, "onGetDefaultVoiceNameFor($lang,$country,$variant) → ${resolved ?: "null"} (unificado=${snap.unifiedVoiceMode})")
         return resolved
     }
 
@@ -470,7 +470,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val configuredName = runCatching { settings?.snapshotBlocking()?.voice }
             .getOrNull() ?: EdgeProtocolConstants.DEFAULT_VOICE
         val catalogVoices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
-        // TODO el catÃ¡logo, con los locales reales: el framework busca aquÃ©
+        // TODO el catálogo, con los locales reales: el framework busca aquí
         // cualquier voz que un cliente pida (findVoice). Sin la voz pedida en
         // esta lista, setVoice() se descarta en silencio.
         val list = if (catalogVoices.isEmpty()) {
@@ -492,20 +492,20 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
     /**
      * Construye un [Voice] Android. La voz configurada se marca como
-     * predeterminada vÃ©a el constructor oculto de 7 parÃ¡metros (isDefault);
-     * si la reflexiÃ³n no estÃ¡ disponible, se degrada al constructor pÃºblico
-     * de 6 y la predeterminada se resuelve igualmente por configuraciÃ³n.
+     * predeterminada vía el constructor oculto de 7 parámetros (isDefault);
+     * si la reflexión no está disponible, se degrada al constructor público
+     * de 6 y la predeterminada se resuelve igualmente por configuración.
      *
-     * SOBRE requiresNetwork = false: Edge es un TTS de nube y tÃ©cnicamente
+     * SOBRE requiresNetwork = false: Edge es un TTS de nube y técnicamente
      * necesita red, pero marcar `true` hace que los clientes que filtran
-     * voces "usables sin conexiÃ³n" âen particular Google Play Books en su
-     * modo "TTS offline/local"â¬¤â¬¤ descarten TODAS nuestras voces y caigan en
+     * voces "usables sin conexión" —en particular Google Play Books en su
+     * modo "TTS offline/local"— descarten TODAS nuestras voces y caigan en
      * Google TTS. Marcamos `false` para que el motor sea seleccionable por
-     * esos clientes; la sÃ©ntesis seguirÃ¡ requiriendo red y, si no la hay,
-     * fallarÃ¡ con un error claro.
+     * esos clientes; la síntesis seguirá requiriendo red y, si no la hay,
+     * fallará con un error claro.
      */
     private fun edgeToAndroid(v: EdgeVoice, isDefault: Boolean): Voice {
-        // forLanguageTag es tolerante: un locale mal formado del catÃ¡logo no
+        // forLanguageTag es tolerante: un locale mal formado del catálogo no
         // lanza IllformedLocaleException, devuelve un locale "und" inocuo.
         val locale = Locale.forLanguageTag(v.locale.ifBlank { "es-MX" })
         return runCatching {
@@ -535,35 +535,35 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     }
 
     /**
-     * Voz a usar en la sÃ©ntesis:
-     *  1. Voz explÃ©cita del cliente ([SynthesisRequest.getVoiceName]).
-     *  2. Idioma POR PETICIÃ³N (request.language/country): es la fuente mÃ¡s
-     *     fiable â un libro en inglÃ©s pide "en" aunque la sesiÃ³n haya
-     *     cargado espaÃ±ol antes. Para espaÃ±ol se respeta la voz configurada;
+     * Voz a usar en la síntesis:
+     *  1. Voz explícita del cliente ([SynthesisRequest.getVoiceName]).
+     *  2. Idioma POR PETICIÓN (request.language/country): es la fuente más
+     *     fiable — un libro en inglés pide "en" aunque la sesión haya
+     *     cargado español antes. Para español se respeta la voz configurada;
      *     para OTRO idioma, la voz expuesta de ese idioma.
-     *  3. Idioma cargado en la sesiÃ³n (onLoadLanguage).
+     *  3. Idioma cargado en la sesión (onLoadLanguage).
      *  4. Voz predeterminada configurada (Dalia).
      */
     private fun resolveVoice(request: SynthesisRequest, snap: SettingsStore.Snapshot): String {
-        // 1) Voz explÃ©cita del cliente (cualquier voz del catÃ¡logo). Tiene la
-        //    mÃ¡xima prioridad: si el usuario eligiÃ³ una voz concreta en
-        //    Ajustes (o la app llamÃ³ setVoice), ese voiceName llega aquÃ© y
-        //    gana. Se valida contra el catÃ¡logo: si Microsoft la retirÃ³, se
+        // 1) Voz explícita del cliente (cualquier voz del catálogo). Tiene la
+        //    máxima prioridad: si el usuario eligió una voz concreta en
+        //    Ajustes (o la app llamó setVoice), ese voiceName llega aquí y
+        //    gana. Se valida contra el catálogo: si Microsoft la retiró, se
         //    usa un respaldo del mismo idioma en lugar de enviar un nombre
         //    inexistente a Edge.
         val name = request.voiceName?.trim().orEmpty()
         if (name.isNotEmpty()) return validatedVoice(name)
 
-        // 2) Idioma por peticiÃ³n (request.language/country): es la fuente mÃ¡s
-        //    fiable. Delega en resolveDefaultVoiceFor para que la resoluciÃ³n
-        //    sea idÃ©ntica a la que promete onGetDefaultVoiceNameFor (modo
-        //    unificado: la voz de la app para su idioma; si no, catÃ¡logo).
+        // 2) Idioma por petición (request.language/country): es la fuente más
+        //    fiable. Delega en resolveDefaultVoiceFor para que la resolución
+        //    sea idéntica a la que promete onGetDefaultVoiceNameFor (modo
+        //    unificado: la voz de la app para su idioma; si no, catálogo).
         val lang = normLang(request.language.orEmpty())
         if (lang.isNotEmpty()) {
             resolveDefaultVoiceFor(lang, request.country.orEmpty(), snap)?.let { return it }
         }
 
-        // 3) Idioma cargado en la sesiÃ³n (onLoadLanguage).
+        // 3) Idioma cargado en la sesión (onLoadLanguage).
         val loaded = currentLanguage
         val l3 = normLang(loaded.getOrElse(0) { "" })
         if (l3.isNotEmpty()) {
@@ -574,20 +574,20 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         return validatedVoice(snap.voice)
     }
 
-    // ââ¬¤ Velocidad y tono (ajustes de la app + sliders de Android) ââ¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤
+    // ── Velocidad y tono (ajustes de la app + sliders de Android) ────────────
     // request.speechRate y request.pitch son enteros donde 100 = 1.0x (los
-    // envÃ©an los sliders de Ajustes â Texto a voz). Se combinan de forma
+    // envían los sliders de Ajustes → Texto a voz). Se combinan de forma
     // aditiva con el ajuste propio de la app y se limitan al rango que Edge
     // acepta. Los valores por defecto (velocidad +0%, tono +0Hz) coinciden
     // EXACTAMENTE con los del navegador Edge / edge-tts, de modo que la
     // prosodia natural (incluidas las pausas en comas y puntos, que en las
-    // voces neuronales de Edge son algo mÃ¡s largas que en Google TTS) se
+    // voces neuronales de Edge son algo más largas que en Google TTS) se
     // reproduce igual que en el navegador.
 
     /**
      * % de velocidad para Edge: ajuste de la app + slider de Android. El
-     * slider del sistema llega hasta 2.0x (speechRate=200 â +100), asÃ© que el
-     * lÃ©mite superior es +100 para honrar esa velocidad real (Edge la acepta);
+     * slider del sistema llega hasta 2.0x (speechRate=200 → +100), así que el
+     * límite superior es +100 para honrar esa velocidad real (Edge la acepta);
      * el inferior se mantiene en -50 (media velocidad, como el navegador).
      */
     private fun effectiveRatePercent(snap: SettingsStore.Snapshot, request: SynthesisRequest): Int =
@@ -596,19 +596,19 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     /**
      * Tono para Edge en Hz: ajuste de la app + slider de Android. Se usa Hz
      * (signedHertz), NO %, porque es la unidad que el motor de referencia
-     * (edge-tts) envÃ©a a este endpoint y la que se sabe que acepta: el
+     * (edge-tts) envía a este endpoint y la que se sabe que acepta: el
      * atributo pitch de Edge espera `+XHz` (o semitonos), y un valor en %
-     * podrÃ©a ser ignorado o rechazado. El multiplicador del slider
+     * podría ser ignorado o rechazado. El multiplicador del slider
      * (request.pitch, 100 = 1.0x) se traduce a un desplazamiento en Hz. Se
-     * acota a Â50Hz, el rango cÃ³modo que Edge maneja bien sin distorsionar.
+     * acota a ±50Hz, el rango cómodo que Edge maneja bien sin distorsionar.
      */
     private fun effectivePitchHz(snap: SettingsStore.Snapshot, request: SynthesisRequest): Int =
         (snap.pitchHz + (request.pitch - 100)).coerceIn(-50, 50)
 
-    // ââ¬¤ SÃ©ntesis ââ¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤â¬¤
+    // ── Síntesis ────────────────────────────────────────────────────────────
 
     override fun onSynthesizeText(request: SynthesisRequest, callback: SynthesisCallback) {
-        // Metadatos de la peticiÃ³n para depurar la integraciÃ³n con el sistema
+        // Metadatos de la petición para depurar la integración con el sistema
         // (longitud del texto, NO el contenido; nunca datos sensibles).
         Log.d(
             TAG,
@@ -640,7 +640,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
         val text = request.charSequenceText?.toString()
 
-        // Texto vacÃ©o o nulo: ÃÂ©xito silencioso sin tocar la red.
+        // Texto vacío o nulo: éxito silencioso sin tocar la red.
         if (text.isNullOrBlank()) {
             runCatching {
                 callback.start(
@@ -654,7 +654,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
 
         val snap = settings?.snapshotBlocking()
-            ?: return guard.error(callback, "No se pudo leer la configuraciÃ³n local.")
+            ?: return guard.error(callback, "No se pudo leer la configuración local.")
 
         val segments = runCatching {
             TextSegmenter.segment(text) { stopRequested }
@@ -675,8 +675,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val voice = resolveVoice(request, snap)
         // Velocidad y tono EFECTIVOS: combinan el ajuste de la app con los
         // sliders de Ajustes de Android (request.speechRate / request.pitch,
-        // donde 100 = 1.0x). Antes se ignoraban estos ÃÂºltimos y mover los
-        // sliders del sistema no tenÃ©a efecto (Punto 4).
+        // donde 100 = 1.0x). Antes se ignoraban estos últimos y mover los
+        // sliders del sistema no tenía efecto (Punto 4).
         val rate = SsmlBuilder.signedPercent(effectiveRatePercent(snap, request))
         val pitch = SsmlBuilder.signedHertz(effectivePitchHz(snap, request))
         val started = AtomicBoolean(false)
@@ -687,7 +687,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                     callback.start(
                         rate,
                         AudioFormat.ENCODING_PCM_16BIT,
-                        // NÃºmero de canales (1), no la mÃ¡scara CHANNEL_OUT_MONO.
+                        // Número de canales (1), no la máscara CHANNEL_OUT_MONO.
                         EdgeProtocolConstants.CHANNEL_COUNT_MONO
                     )
                 }.isSuccess
@@ -726,14 +726,14 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     }
 
     /**
-     * SÃ©ntesis por segmento con el ÃNICO formato que usa el cliente de
+     * Síntesis por segmento con el ÚNICO formato que usa el cliente de
      * referencia: audio-24khz-48kbitrate-mono-mp3. El servidor lo produce sin
      * problemas; se decodifica a PCM 16-bit con MediaCodec ANTES de entregarlo
      * a SynthesisCallback (que exige PCM crudo). No hay reintento con otros
-     * formatos: el RIFF/PCM estÃ¡ verificado que NO produce audio en este
-     * endpoint, asÃ© que reintentar con ÃÂ©l solo gastarÃ©a peticiones.
+     * formatos: el RIFF/PCM está verificado que NO produce audio en este
+     * endpoint, así que reintentar con él solo gastaría peticiones.
      *
-     * La cachÃ© guarda SIEMPRE el PCM final decodificado a 24 kHz.
+     * La caché guarda SIEMPRE el PCM final decodificado a 24 kHz.
      */
     private fun synthesizeSegment(
         segment: String,
@@ -760,7 +760,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         )
     }
 
-    /** Un intento de sÃ©ntesis con un formato (y decodificador) concretos. */
+    /** Un intento de síntesis con un formato (y decodificador) concretos. */
     private fun synthOnce(
         segment: String,
         snap: SettingsStore.Snapshot,
@@ -776,9 +776,9 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val buffer = ByteArrayOutputStream()
 
         val client = http ?: return SegmentOutcome.Failed("Cliente HTTP no inicializado.")
-        // El proveedor se crea por intento: asÃ© siempre usa el User-Agent,
+        // El proveedor se crea por intento: así siempre usa el User-Agent,
         // el Origin y las URLs vigentes (editables desde la app sin
-        // recompilar). El diagnÃ³stico se persiste para depurar desde la app.
+        // recompilar). El diagnóstico se persiste para depurar desde la app.
         val prov: TtsProvider = EdgeProtocolClient(
             client,
             wsBaseUrl = snap.wsUrl,
@@ -819,7 +819,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
         var pcm = synchronized(buffer) { buffer.toByteArray() }
         if (pcm.isEmpty()) {
-            return SegmentOutcome.Failed("El proveedor no devolviÃ³ audio (respuesta vacÃ©a).")
+            return SegmentOutcome.Failed("El proveedor no devolvió audio (respuesta vacía).")
         }
 
         var sampleRate = EdgeProtocolConstants.SAMPLE_RATE_HZ
@@ -831,8 +831,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             pcm = decoded.pcm
             sampleRate = decoded.sampleRateHz
         } else if (AudioFrameParser.detectFormat(pcm) == AudioFrameParser.PayloadFormat.COMPRESSED) {
-            // El servidor ignorÃ³ la peticiÃ³n de PCM y enviÃ³ comprimido de
-            // todas formas (MP3 en la prÃ¡ctica): se decodifica igualmente.
+            // El servidor ignoró la petición de PCM y envió comprimido de
+            // todas formas (MP3 en la práctica): se decodifica igualmente.
             val decoded = runCatching { mp3Decoder.decode(pcm) }
                 .getOrElse {
                     return SegmentOutcome.Failed(
@@ -843,7 +843,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             sampleRate = decoded.sampleRateHz
         }
 
-        // La cachÃ© guarda el PCM final (siempre 24 kHz con los formatos de
+        // La caché guarda el PCM final (siempre 24 kHz con los formatos de
         // Edge); nunca el audio comprimido ni el texto en claro como nombre.
         if (snap.cacheEnabled && cacheKey != null && sampleRate == EdgeProtocolConstants.SAMPLE_RATE_HZ) {
             runCatching { cache?.write(cacheKey, pcm) }
@@ -852,7 +852,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     }
 
     /**
-     * EnvÃ©a el PCM en bloques limitados. La cancelaciÃ³n se detecta en cada
+     * Envía el PCM en bloques limitados. La cancelación se detecta en cada
      * paso mediante [stopRequested], que activa onStop(): ese es el mecanismo
      * soportado en API 36 (SynthesisCallback.isVoicing fue eliminada del
      * framework; no usarla, no compila con compileSdk 36).
@@ -876,9 +876,36 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         active?.cancel()
     }
 
+    /**
+     * Garantiza una única llamada terminal (done XOR error). El resto del
+     * servicio puede llamar done/error con libertad: solo la primera surte
+     * efecto, como exige el contrato de SynthesisCallback.
+     */
+    private class TerminalGuard {
+        private val fired = AtomicBoolean(false)
+
+        val isFired: Boolean
+            get() = fired.get()
+
+        fun done(callback: SynthesisCallback) {
+            if (fired.compareAndSet(false, true)) runCatching { callback.done() }
+        }
+
+        fun error(
+            callback: SynthesisCallback,
+            message: String,
+            persist: ((String) -> Unit)? = null
+        ) {
+            if (fired.compareAndSet(false, true)) {
+                persist?.invoke(message)
+                runCatching { callback.error() }
+            }
+        }
+    }
+
     private fun TimeoutExceptionShim(): Throwable =
         java.util.concurrent.TimeoutException(
-            "La sÃ©ntesis superÃ³ el tiempo mÃ¡ximo permitido"
+            "La síntesis superó el tiempo máximo permitido"
         )
 
     companion object {

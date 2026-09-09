@@ -1,168 +1,116 @@
 package dev.experimental.edgetts
 
 /**
- * Segmenta texto por bytes UTF-8 no caracteres, replicando el comportamiento de rany2/edge-tts v7.2.8 splitTextByByteLength.
- * Esto es crítico para idiomas con caracteres multi-byte:
- * - CJK (chino, japon\u00e9s, coreano) ~3 bytes por car\u00e1cter
- * - \u00c1rabe, hebreo ~2 bytes por car\u00e1cter
- * - Espa\u00f1ol, franc\u00e9s 1-2 bytes por car\u00e1cter
+ * Divide el texto en fragmentos aptos para el WebSocket:
+ *  - conserva párrafos y su orden;
+ *  - corta por puntuación (. ! ? … ; :) sin partir palabras;
+ *  - ningún fragmento supera [MAX_SEGMENT_CHARS] (4.000) caracteres;
+ *  - admite cancelación cooperativa entre fragmentos.
  *
- * Con 4096 bytes, todos los idiomas tienen el mismo l\u00edmite efectivo.
+ * Nunca se envía un libro entero en una sola petición.
  */
 object TextSegmenter {
-    /** L\u00edmite en bytes UTF-8 (no caracteres). Replicado de rany2/edge-tts splitTextByByteLength(text, 4096) */
-    const val MAX_SEGMENT_BYTES: Int = 4096
 
-    /**
-     * Segmenta el texto en fragmentos de m\u00e1ximo MAX_SEGMENT_BYTES bytes UTF-8.
-     * Estrategia de divisi\u00f3n (prioridad):
-     * 1. Saltos de l\u00ednea dobles (p\u00e1rrafos)
-     * 2. Saltos de l\u00ednea simples
-     * 3. Espacios (palabras)
-     * 4. L\u00edmite duro (sin partir caracteres multi-byte)
-     *
-     * @param text Texto a segmentar
-     * @param isCancelled Funci\u00f3n de cancelaci\u00f3n cooperativa
-     * @return Lista de segmentos, cada uno <= MAX_SEGMENT_BYTES bytes UTF-8
-     */
-    fun segment(text: String, isCancelled: () -> Boolean = { false }): List<String> {
-        // Texto vacío devuelve lista vac\u00eda
-        if (text.isBlank()) return emptyList()
+    const val MAX_SEGMENT_CHARS: Int = EdgeProtocolConstants.MAX_SEGMENT_CHARS
 
-        // Separar por párrafos (\n\n)
-        val paragraphs = text.split("\n\n")
-        
-        val result = mutableListOf<String>()
+    fun segment(text: String): List<String> = segment(text) { false }
+
+    fun segment(text: String, isCancelled: () -> Boolean): List<String> {
+        val result = ArrayList<String>()
+        val paragraphs = text.split(Regex("\\n+"))
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
         for (paragraph in paragraphs) {
             if (isCancelled()) break
-            
-            val trimmed = paragraph.trim()
-            if (trimmed.isBlank()) continue
-            
-            val utf8Bytes = trimmed.toByteArray(Charsets.UTF_8)
-            if (utf8Bytes.size <= MAX_SEGMENT_BYTES) {
-                result.add(trimmed)
-            } else {
-                // Pá¬¡rrafo largo - aplicar segmentaci\u00f3n por bytes
-                result.addAll(segmentByBytes(trimmed, isCancelled))
-            }
-        }
-        
-        return result
-    }
+            val current = StringBuilder()
 
-    /**
-     * Segmenta un texto por bytes UTF-8 cuando excede MAX_SEGMENT_BYTES.
-     * Estrategia de divisi\u00f3n (prioridad):
-     * 1. Salto de l\u00ednea simple
-     * 2. Espacio (palabra)
-     * 3. L\u00edmite duro (sin partir caracteres multi-byte)
-     */
-    private fun segmentByBytes(text: String, isCancelled: () -> Boolean): List<String> {
-        val result = mutableListOf<String>()
-        val utf8Bytes = text.toByteArray(Charsets.UTF_8)
-        var offset = 0
+            for (sentence in splitSentences(paragraph)) {
+                if (isCancelled()) break
 
-        while (offset < utf8Bytes.size && !isCancelled()) {
-            // Calcular el l\u00edmite para este segmento
-            val segmentEnd = minOf(offset + MAX_SEGMENT_BYTES, utf8Bytes.size)
-
-            if (segmentEnd >= utf8Bytes.size) {
-                // \u00daltimo segmento - tomar todo lo restante
-                val segment = utf8Bytes.decodeUtf8Safe(offset, utf8Bytes.size)
-                if (segment.isNotBlank()) {
-                    result.add(segment)
+                if (sentence.length > MAX_SEGMENT_CHARS) {
+                    if (current.isNotEmpty()) {
+                        result += current.toString().trim()
+                        current.clear()
+                    }
+                    result += splitOversized(sentence)
+                    continue
                 }
-                break
+
+                if (current.isNotEmpty() && current.length + sentence.length + 1 > MAX_SEGMENT_CHARS) {
+                    result += current.toString().trim()
+                    current.clear()
+                }
+                if (current.isNotEmpty()) current.append(' ')
+                current.append(sentence)
             }
 
-            // Buscar punto de divisi\u00f3n inteligente
-            val splitPoint = findSmartSplitPoint(utf8Bytes, offset, segmentEnd)
-
-            // Extraer segmento
-            val segment = utf8Bytes.decodeUtf8Safe(offset, splitPoint)
-            if (segment.isNotBlank()) {
-                result.add(segment)
-            }
-
-            offset = splitPoint
+            if (current.isNotEmpty()) result += current.toString().trim()
         }
 
-        return result
+        return result.filter { it.isNotBlank() }
     }
 
-    /**
-     * Busca el mejor punto de divisi\u00f3n dentro del rango [start, end).
-     * Prioridad: 1. Salto de l\u00ednea, 2. Espacio, 3. L\u00edmite duro
-     */
-    private fun findSmartSplitPoint(bytes: ByteArray, start: Int, end: Int): Int {
-        // Buscar desde el final hacia el inicio (preferir divisi\u00f3n tard\u00eda)
+    /** Corta por puntuación de fin de frase, dejando el signo en la frase anterior. */
+    private fun splitSentences(paragraph: String): List<String> =
+        paragraph
+            .split(Regex("(?<=[.!?…;:])\\s+"))
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
 
-        // 1. Buscar salto de l\u00ednea simple
-        for (i in end - 1 downTo start) {
-            if (bytes[i].toInt() == 0x0A) { // '\n'
-                return i + 1 // Incluir el salto de l\u00ednea en el segmento anterior
-            }
-        }
+    /** Una "frase" sin puntuación que supera el límite: primero comas, luego espacios. */
+    private fun splitOversized(sentence: String): List<String> {
+        val chunks = ArrayList<String>()
+        val pending = StringBuilder()
 
-        // 2. Buscar espacio (palabra)
-        for (i in end - 1 downTo start) {
-            if (bytes[i].toInt() == 0x20) { // ' '
-                return i + 1 // Incluir el espacio en el segmento anterior
+        fun flush() {
+            if (pending.isNotEmpty()) {
+                chunks += pending.toString().trim()
+                pending.clear()
             }
         }
 
-        // 3. L\u00edmite duro - asegurar que no partimos un car\u00e1cter multi-byte
-        return findUtf8SafeBoundary(bytes, start, end)
-    }
-
-    /**
-     * Encuentra un l\u00edmite seguro para UTF-8 que no parta un car\u00e1cter multi-byte.
-     * UTF-8 encoding:
-     * - 0xxxxxxx: 1 byte (ASCII)
-     * - 110xxxxx 10xxxxxx: 2 bytes
-     * - 1110xxxx 10xxxxxx 10xxxxxx: 3 bytes
-     * - 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx: 4 bytes
-     *
-     * Los bytes de continuaci\u00f3n empiezan con 10xxxxxx (0x80-0xBF).
-     */
-    private fun findUtf8SafeBoundary(bytes: ByteArray, start: Int, end: Int): Int {
-        var safeEnd = end
-
-        // Retroceder hasta encontrar un byte que NO sea de continuaci\u00f3n
-        while (safeEnd > start && isUtf8ContinuationByte(bytes[safeEnd - 1])) {
-            safeEnd--
+        for (clause in sentence.split(Regex("(?<=[,;])\\s+"))) {
+            if (clause.isEmpty()) continue
+            if (pending.isNotEmpty() && pending.length + clause.length + 1 > MAX_SEGMENT_CHARS) {
+                flush()
+            }
+            if (clause.length > MAX_SEGMENT_CHARS) {
+                flush()
+                chunks += splitByWords(clause)
+            } else {
+                if (pending.isNotEmpty()) pending.append(' ')
+                pending.append(clause)
+            }
         }
-
-        return safeEnd
+        flush()
+        return chunks.filter { it.isNotEmpty() }
     }
 
-    /**
-     * Verifica si un byte es un byte de continuaci\u00f3n UTF-8 (10xxxxxx).
-     */
-    private fun isUtf8ContinuationByte(byte: Byte): Boolean {
-        val b = byte.toInt() and 0xFF
-        return (b and 0xC0) == 0x80
-    }
+    /** Corta por espacios sin partir palabras; solo un token degenerado se corta en duro. */
+    private fun splitByWords(text: String): List<String> {
+        val chunks = ArrayList<String>()
+        val pending = StringBuilder()
 
-    /**
-     * Decodifica un rango de bytes UTF-8 de forma segura.
-     * Si el rango termina en medio de un car\u00e1cter multi-byte, lo excluye.
-     */
-    private fun ByteArray.decodeUtf8Safe(start: Int, end: Int): String {
-        if (start >= end) return ""
+        // El lookbehind conserva el espacio al final de cada pieza.
+        for (piece in text.split(Regex("(?<=\\s)"))) {
+            if (piece.isEmpty()) continue
 
-        // Asegurar que no partimos un car\u00e1cter multi-byte
-        var safeEnd = end
-        while (safeEnd > start && isUtf8ContinuationByte(this[safeEnd - 1])) {
-            safeEnd--
+            if (piece.length > MAX_SEGMENT_CHARS) {
+                if (pending.isNotEmpty()) {
+                    chunks += pending.toString().trimEnd()
+                    pending.clear()
+                }
+                chunks += piece.chunked(MAX_SEGMENT_CHARS)
+                continue
+            }
+            if (pending.length + piece.length > MAX_SEGMENT_CHARS) {
+                chunks += pending.toString().trimEnd()
+                pending.clear()
+            }
+            pending.append(piece)
         }
-
-        return String(this, start, safeEnd - start, Charsets.UTF_8)
+        if (pending.isNotEmpty()) chunks += pending.toString().trimEnd()
+        return chunks
     }
-
-    /**
-     * Versi\u00f3n de compatibilidad: segmenta con cancelaci\u00f3n por defecto desactivada.
-     */
-    fun segment(text: String): List<String> = segment(text, isCancelled = { false })
 }

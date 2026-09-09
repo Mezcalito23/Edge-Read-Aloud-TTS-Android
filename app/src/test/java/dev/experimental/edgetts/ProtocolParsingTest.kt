@@ -12,12 +12,12 @@ import java.util.concurrent.TimeoutException
 
 /**
  * Parseo de catálogo, frames del protocolo, formatos de audio, clave de
- * caché·¡, token Sec-MS-GEC y mapeo de errores. Nada necesita red ni Android:
+ * caché, token Sec-MS-GEC y mapeo de errores. Nada necesita red ni Android:
  * son pruebas de JVM (./gradlew test).
  */
 class ProtocolParsingTest {
 
-    // ── Cat\u00e1logo JSON ───────────────────────────────────────────────────────
+    // ── Catálogo JSON ───────────────────────────────────────────────────────
 
     private val sampleCatalog = """
         [
@@ -70,7 +70,7 @@ class ProtocolParsingTest {
     fun catalogWithMalformedJsonThrows() {
         try {
             newCatalogRepo().parseCatalog("esto no es json")
-            fail("deb\u00eda lanzar")
+            fail("debía lanzar")
         } catch (_: org.json.JSONException) {
             // Esperado: refresh() lo convierte en CatalogResult con error.
         }
@@ -90,11 +90,11 @@ class ProtocolParsingTest {
     @Test
     fun binaryFrameWithLengthPrefixAndDoubleCrlf() {
         // Formato del wire real: [2 bytes longitud][cabeceras terminadas en
-        // \r\n\r\n][audio]. Longitud 39 = cabeceras completas.
+        // \r\n\r\n][audio]. Longitud 45 = cabeceras completas.
         val headers = "Path:audio\r\nContent-Type:audio/mpeg\r\n\r\n".toByteArray(Charsets.US_ASCII)
-        assertEquals(39, headers.size)  // Corregido: 10+2+23+2+2 = 39
+        assertEquals(45, headers.size)
         val audio = byteArrayOf(1, 2, 3)
-        val frame = byteArrayOf(0x00, 39) + headers + audio  // Corregido
+        val frame = byteArrayOf(0x00, 45) + headers + audio
         val parsed = AudioFrameParser.parseBinaryFrame(frame)
         assertEquals("audio", parsed.path)
         assertArrayEquals(audio, parsed.payload)
@@ -105,12 +105,12 @@ class ProtocolParsingTest {
     fun binaryFrameWithoutDoubleCrlfIsParsedByLengthPrefix() {
         // Los frames binarios terminan cada cabecera con UN solo \r\n (sin
         // doble). El parser debe usar el prefijo de longitud, no buscar
-        // \r\n\r\n \u2014 buscarlo descartaba los frames y causaba "turn.end sin
+        // \r\n\r\n — buscarlo descartaba los frames y causaba "turn.end sin
         // audio" con decenas de frames recibidos.
         val headers = "Path:audio\r\nContent-Type:audio/mpeg\r\n".toByteArray(Charsets.US_ASCII)
-        assertEquals(37, headers.size)  // Corregido: 10+2+23+2 = 37
+        assertEquals(43, headers.size)
         val audio = byteArrayOf(9, 9, 9)
-        val frame = byteArrayOf(0x00, 37) + headers + audio  // Corregido
+        val frame = byteArrayOf(0x00, 43) + headers + audio
         val parsed = AudioFrameParser.parseBinaryFrame(frame)
         assertEquals("audio", parsed.path)
         assertArrayEquals(audio, parsed.payload)
@@ -118,13 +118,13 @@ class ProtocolParsingTest {
 
     @Test
     fun binaryFramePrefixWithPrintableSecondByteDoesNotCorruptPathKey() {
-        // REGRESI\u00d3N: el segundo byte del prefijo de longitud puede ser un
-        // car\u00e1cter ASCII imprimible (aqu\u00ed 'P' = 0x50, con longitud real 80).
+        // REGRESIÓN: el segundo byte del prefijo de longitud puede ser un
+        // carácter ASCII imprimible (aquí 'P' = 0x50, con longitud real 80).
         // El parser no debe confundir ese byte con texto de cabeceras ni
         // corromper la clave "Path".
         val pad = "x".repeat(33)
         val headers = ("Path:audio\r\nContent-Type:audio/mpeg\r\nX-Pad:$pad\r\n\r\n")
-            .toByteArray(Charsets.US_ASCII) // 80 bytes \u2192 prefijo 0x00 0x50
+            .toByteArray(Charsets.US_ASCII) // 80 bytes → prefijo 0x00 0x50
         assertEquals(80, headers.size)
         val audio = byteArrayOf(1, 2, 3)
         val frame = byteArrayOf(0x00, 'P'.code.toByte()) + headers + audio
@@ -159,7 +159,7 @@ class ProtocolParsingTest {
         assertArrayEquals(byteArrayOf(9, 9, 8, 8), pcm)
     }
 
-    // ── Detecci\u00f3n de formatos ───────────────────────────────────────────────
+    // ── Detección de formatos ───────────────────────────────────────────────
 
     @Test
     fun mp3PayloadsAreDetectedAsCompressed() {
@@ -195,7 +195,7 @@ class ProtocolParsingTest {
     @Test
     fun verifiedProtocolConstantsMatchTheReferenceClient() {
         // VERIFICADO contra constants.py de rany2/edge-tts 7.2.8: si estos
-        // valores cambian aqu\u00ed, hay que comprobarlos contra la referencia.
+        // valores cambian aquí, hay que comprobarlos contra la referencia.
         assertEquals("1-143.0.3650.75", EdgeProtocolConstants.CLIENT_VERSION)
         assertEquals(
             "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold",
@@ -209,7 +209,7 @@ class ProtocolParsingTest {
         assertEquals(24000, EdgeProtocolConstants.SAMPLE_RATE_HZ)
     }
 
-    // ── Clave de cach\u00e9 SHA-256 ──────────────────────────────────────────────
+    // ── Clave de caché SHA-256 ──────────────────────────────────────────────
 
     @Test
     fun sha256MatchesKnownVector() {
@@ -235,12 +235,12 @@ class ProtocolParsingTest {
     @Test
     fun secMsGecIsDeterministicWithinAWindow() {
         val token = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
-        // Dos instantes dentro del MISMO intervalo de 5 minutos \u2192 mismo token.
+        // Dos instantes dentro del MISMO intervalo de 5 minutos → mismo token.
         val base = 1_735_689_600L // 2025-01-01 00:00:00 UTC, divisible por 300
         val a = EdgeProtocolClient.generateSecMsGec(base, token)
         val b = EdgeProtocolClient.generateSecMsGec(base + 299, token)
         assertEquals(a, b)
-        // Formato: 64 caracteres hexadecimales en MAY\u00daSCULAS.
+        // Formato: 64 caracteres hexadecimales en MAYÚSCULAS.
         assertEquals(64, a.length)
         assertTrue(Regex("^[0-9A-F]{64}$").matches(a))
     }
@@ -250,10 +250,10 @@ class ProtocolParsingTest {
         val token = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
         val base = 1_735_689_600L
         val a = EdgeProtocolClient.generateSecMsGec(base, token)
-        // Cruzar al siguiente intervalo de 5 minutos \u2192 token distinto.
+        // Cruzar al siguiente intervalo de 5 minutos → token distinto.
         val next = EdgeProtocolClient.generateSecMsGec(base + 300, token)
         assertTrue(a != next)
-        // Cambiar el TrustedClientToken tambi\u00e9n debe alterar el resultado.
+        // Cambiar el TrustedClientToken también debe alterar el resultado.
         assertTrue(a != EdgeProtocolClient.generateSecMsGec(base, "OTHER"))
     }
 
@@ -262,9 +262,9 @@ class ProtocolParsingTest {
     @Test
     fun httpErrorsMapToReadableSpanish() {
         assertTrue(ErrorMapper.spanish(ProviderHttpException(403, "x")).contains("403"))
-        assertTrue(ErrorMapper.spanish(ProviderHttpException(429, "x")).contains("l\u00edmite"))
-        assertTrue(ErrorMapper.spanish(ProviderHttpException(400, "x")).contains("inv\u00e1lido"))
-        assertTrue(ErrorMapper.spanish(ProviderHttpException(401, "x")).contains("autenticaci\u00f3n"))
+        assertTrue(ErrorMapper.spanish(ProviderHttpException(429, "x")).contains("límite"))
+        assertTrue(ErrorMapper.spanish(ProviderHttpException(400, "x")).contains("inválido"))
+        assertTrue(ErrorMapper.spanish(ProviderHttpException(401, "x")).contains("autenticación"))
         assertTrue(ErrorMapper.spanish(ProviderHttpException(404, "x")).contains("404"))
         assertTrue(ErrorMapper.spanish(ProviderHttpException(503, "x")).contains("503"))
     }
@@ -273,12 +273,12 @@ class ProtocolParsingTest {
     fun networkAndAudioErrorsMapToReadableSpanish() {
         assertTrue(ErrorMapper.spanish(SocketTimeoutException()).contains("Tiempo de espera"))
         assertTrue(ErrorMapper.spanish(TimeoutException()).contains("Tiempo de espera"))
-        assertTrue(ErrorMapper.spanish(IOException("EOF: conexi\u00f3n cerrada")).contains("cerr\u00f3"))
+        assertTrue(ErrorMapper.spanish(IOException("EOF: conexión cerrada")).contains("cerró"))
         assertTrue(
             ErrorMapper.spanish(UnsupportedAudioFormatException("opus"))
                 .contains("decodificable")
         )
-        assertTrue(ErrorMapper.spanish(NoAudioReceivedException()).contains("no envi\u00f3 audio"))
+        assertTrue(ErrorMapper.spanish(NoAudioReceivedException()).contains("no envió audio"))
         assertTrue(ErrorMapper.spanish(SynthesisCancelledException()).contains("cancelada"))
     }
 }
