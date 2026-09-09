@@ -20,11 +20,11 @@ object SsmlBuilder {
     fun escapeXml(raw: String): String = buildString(raw.length + 16) {
         for (c in raw) {
             when (c) {
-                '&' -> append("&")
-                '<' -> append("<")
-                '>' -> append(">")
-                '"' -> append("\"")
-                '\'' -> append("'")
+                '&' -> append("&amp;")
+                '<' -> append("&lt;")
+                '>' -> append("&gt;")
+                '"' -> append("&quot;")
+                '\'' -> append("&apos;")
                 else -> append(c)
             }
         }
