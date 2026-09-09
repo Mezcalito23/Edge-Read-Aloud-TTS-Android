@@ -26,18 +26,22 @@ object TextSegmenter {
      * @return Lista de segmentos, cada uno <= MAX_SEGMENT_BYTES bytes UTF-8
      */
     fun segment(text: String, isCancelled: () -> Boolean = { false }): List<String> {
-        // Si el texto cabe en un segmento, devolverlo directamente
+        // Texto vacío devuelve lista vac\u00eda
+        if (text.isBlank()) return emptyList()
+
         val utf8Bytes = text.toByteArray(Charsets.UTF_8)
-        if (utf8Bytes.size <= MAX_SEGMENT_BYTES) {
+
+        // Si el texto cabe en un segmento y no tiene saltos de l\u00ednea, devolverlo directamente
+        if (utf8Bytes.size <= MAX_SEGMENT_BYTES && !text.contains("\n")) {
             return listOf(text.trim())
         }
 
-        // Texto largo - aplicar segmentaci\u00f3n por bytes
+        // Texto largo o con saltos de l\u00ednea - aplicar segmentaci\u00f3n por bytes
         return segmentByBytes(text, isCancelled)
     }
 
     /**
-     * Segmenta un texto por bytes UTF-8 cuando excede MAX_SEGMENT_BYTES.
+     * Segmenta un texto por bytes UTF-8 cuando excede MAX_SEGMENT_BYTES o tiene saltos de l\u00ednea.
      * Estrategia de divisi\u00f3n (prioridad):
      * 1. Doble salto de l\u00ednea (p\u00e1rrafo)
      * 2. Salto de l\u00ednea simple
