@@ -92,9 +92,9 @@ class ProtocolParsingTest {
         // Formato del wire real: [2 bytes longitud][cabeceras terminadas en
         // \r\n\r\n][audio]. Longitud 45 = cabeceras completas.
         val headers = "Path:audio\r\nContent-Type:audio/mpeg\r\n\r\n".toByteArray(Charsets.US_ASCII)
-        assertEquals(45, headers.size)
+        assertEquals(39, headers.size)
         val audio = byteArrayOf(1, 2, 3)
-        val frame = byteArrayOf(0x00, 45) + headers + audio
+        val frame = byteArrayOf(0x00, 39) + headers + audio
         val parsed = AudioFrameParser.parseBinaryFrame(frame)
         assertEquals("audio", parsed.path)
         assertArrayEquals(audio, parsed.payload)
@@ -108,9 +108,9 @@ class ProtocolParsingTest {
         // \r\n\r\n — buscarlo descartaba los frames y causaba "turn.end sin
         // audio" con decenas de frames recibidos.
         val headers = "Path:audio\r\nContent-Type:audio/mpeg\r\n".toByteArray(Charsets.US_ASCII)
-        assertEquals(43, headers.size)
+        assertEquals(37, headers.size)
         val audio = byteArrayOf(9, 9, 9)
-        val frame = byteArrayOf(0x00, 43) + headers + audio
+        val frame = byteArrayOf(0x00, 37) + headers + audio
         val parsed = AudioFrameParser.parseBinaryFrame(frame)
         assertEquals("audio", parsed.path)
         assertArrayEquals(audio, parsed.payload)

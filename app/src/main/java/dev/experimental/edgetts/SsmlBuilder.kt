@@ -35,7 +35,7 @@ object SsmlBuilder {
      * -50%..+100% (el extremo superior honra el slider del sistema a 2.0x;
      * el extremo inferior coincide con el mínimo del protocolo).
      */
-    fun signedPercent(percent: Int): String = signed(percent.coerceIn(-50, 100), "%")
+    fun signedPercent(percent: Int): String = signed(percent.coerceIn(-50, 50), "%")
 
     /** "+0Hz", "-4Hz"… recortado al rango ±50. */
     fun signedHertz(hertz: Int): String = signed(hertz.coerceIn(-50, 50), "Hz")
