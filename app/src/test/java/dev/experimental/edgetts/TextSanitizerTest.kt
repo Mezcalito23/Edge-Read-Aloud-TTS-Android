@@ -56,7 +56,7 @@ class TextSanitizerTest {
     @Test
     fun normalizeSpacesHandlesTabsAndNewlines() {
         val input = "Line1\t\t\n\nLine2   with   spaces"
-        val expected = "Line1  Line2 with spaces"  // 2 tabs → 2 espacios, \n\n → se elimina
+        val expected = "Line1 Line2 with spaces"  // tabs→espacios, newlines→elimina, espacios múltiples→1
         assertEquals(expected, TextSanitizer.normalizeSpaces(input))
     }
 
