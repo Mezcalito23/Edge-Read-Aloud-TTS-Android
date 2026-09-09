@@ -37,14 +37,14 @@ object TextSanitizer {
     }
 
     /**
-     * Normaliza espacios: convierte tabs, newlines y carriage returns a espacios,
+     * Normaliza espacios: convierte tabs a espacios, elimina newlines/carriage returns,
      * luego colapsa espacios múltiples.
      */
     fun normalizeSpaces(text: String): String {
         return text
-            .replace("\t", " ")  // Tabs a espacios
-            .replace("\n", " ")  // Newlines a espacios
-            .replace("\r", " ")  // Carriage returns a espacios
+            .replace("\t", " ")  // Tabs a espacios (1 tab = 1 espacio)
+            .replace("\n", "")  // Newlines se eliminan
+            .replace("\r", "")  // Carriage returns se eliminan
             .replace(Regex(" +"), " ")  // Colapsar espacios múltiples
             .trim()
     }
