@@ -36,8 +36,19 @@ object TextSanitizer {
                 (code in 14..31)
     }
 
+    /**
+     * Normaliza espacios colapsando whitespace horizontal (tabs, espacios múltiples)
+     * pero preservando la estructura de párrafos (saltos de línea dobles).
+     */
     fun normalizeSpaces(text: String): String {
-        return text.replace(Regex(" {2,}"), " ")
+        // Primero colapsar tabs y espacios múltiples en secuencias horizontales
+        return text
+            .replace("\t", " ")  // Tabs a espacios
+            .replace(Regex(" {2,}"), " ")  // Mltiples espacios a uno
+            .replace(Regex("\n{2,}"), "\n\n")  // Normalizar saltos múltiples a máximo 2
+            .replace(Regex("\n +"), "\n")  // Espacios después de saltos
+            .replace(Regex(" +\n"), "\n")  // Espacios antes de saltos
+            .trim()
     }
 
     fun sanitize(text: String): String {
