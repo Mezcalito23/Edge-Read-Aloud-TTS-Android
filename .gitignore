@@ -1,28 +1,56 @@
-# Android Studio / IntelliJ IDEA
-.idea/
-*.iml
+```
+# Compressed archives
+*.tar.gz
 
-# Gradle
+# Dependencies
 .gradle/
+node_modules/
+
+# Build artifacts
 build/
-*/build/
+dist/
+target/
 
-# Kotlin
-.kotlin/
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Local SDK configuration
-local.properties
+# Logs
+*.log
 
-# Build outputs
-*.apk
-*.aab
-*.ap_
-*.dex
+# Environment
+.env
+.env.local
+*.env.*
 
-# Native build artifacts
-.externalNativeBuild/
-.cxx/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-# OS files
+# Java
+*.class
+*.jar
+*.war
+*.ear
+
+# Temporary files
+*.tmp
+*~
+
+# OS generated files
 .DS_Store
 Thumbs.db
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Testing
+.mypy_cache/
+.pytest_cache/
+```

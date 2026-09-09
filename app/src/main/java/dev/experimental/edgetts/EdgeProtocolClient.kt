@@ -44,11 +44,13 @@ class EdgeProtocolClient(
     private val wsBaseUrl: String = EdgeProtocolConstants.WS_BASE_URL,
     private val trustedClientToken: String = EdgeProtocolConstants.TRUSTED_CLIENT_TOKEN,
     private val secMsGecVersion: String = EdgeProtocolConstants.CLIENT_VERSION,
-    private val userAgent: String = EdgeProtocolConstants.DEFAULT_USER_AGENT,
-    private val origin: String = EdgeProtocolConstants.DEFAULT_ORIGIN,
+    userAgent: String = EdgeProtocolConstants.DEFAULT_USER_AGENT,
+    origin: String = EdgeProtocolConstants.DEFAULT_ORIGIN,
     private val outputFormat: String = EdgeProtocolConstants.OUTPUT_FORMAT_MP3,
     private val onDiagnostic: ((String) -> Unit)? = null
 ) : TtsProvider {
+
+    private val edgeDrm = EdgeDrm(trustedClientToken, secMsGecVersion, userAgent, origin)
 
     override fun synthesize(
         text: String,
@@ -114,8 +116,8 @@ class EdgeProtocolClient(
             // La URL lleva el token público del protocolo: NO se loguea jamás.
             // Orden de parámetros idéntico al cliente de referencia:
             // TrustedClientToken, ConnectionId, Sec-MS-GEC, Sec-MS-GEC-Version.
-            val nowSeconds = getUnixSeconds()
-            val gec = generateSecMsGec(nowSeconds, trustedClientToken)
+            val gec = edgeDrm.generateSecMsGec()
+            val muid = edgeDrm.getMuid()
 
             val url = wsBaseUrl +
                 "?TrustedClientToken=" + trustedClientToken +
@@ -128,18 +130,19 @@ class EdgeProtocolClient(
             // coincidir byte a byte o el WAF de Microsoft responde 403.
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", userAgent)
-                .header("Origin", origin)
+                .header("User-Agent", edgeDrm.userAgent)
+                .header("Origin", edgeDrm.origin)
                 .header("Pragma", "no-cache")
                 .header("Cache-Control", "no-cache")
                 .header("Accept-Encoding", "gzip, deflate, br, zstd")
                 .header("Accept-Language", "en-US,en;q=0.9")
                 // El cliente real envía la cookie en minúscula y con «;» final.
-                .header("Cookie", "muid=$muid;")
+                .header("Cookie", edgeDrm.buildCookieHeader())
                 .build()
 
             // Diagnóstico del handshake: SOLO metadatos (prefijos de hash,
             // ventana UTC, origen, UA). Nunca el token completo ni la URL.
+            val nowSeconds = edgeDrm.protocolState.getAdjustedUnixSeconds()
             val windowUtc = run {
                 val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
                 fmt.timeZone = TimeZone.getTimeZone("UTC")
@@ -147,8 +150,8 @@ class EdgeProtocolClient(
             }
             logDiag(
                 "GEC=${gec.take(8)}… · ventana=$windowUtc UTC · versión=$secMsGecVersion" +
-                    " · MUID=${muid.take(8)}… · Origin=${origin.take(24)}…" +
-                    " · UA=…${userAgent.substringAfterLast(' ')}" +
+                    " · MUID=${muid.take(8)}… · Origin=${edgeDrm.origin.take(24)}…" +
+                    " · UA=…${edgeDrm.userAgent.substringAfterLast(' ')}" +
                     " · intento=${attempts.get() + 1 + gecRefreshes.get()}"
             )
 
@@ -308,19 +311,19 @@ class EdgeProtocolClient(
                     if (code == 403 && !receivedAudio.get() &&
                         gecRefreshes.getAndIncrement() == 0
                     ) {
-                        val serverSeconds = response?.header("Date")
-                            ?.let { parseRfc2616Date(it) }
-                        if (serverSeconds != null) {
-                            clockSkewSeconds += serverSeconds - getUnixSeconds()
+                        val adjusted = edgeDrm.adjustClockSkewFromServerDate(response?.header("Date"))
+                        if (adjusted) {
+                            val skew = edgeDrm.protocolState.getSkewSeconds()
+                            Log.w(
+                                TAG,
+                                "403 en handshake: deriva ajustada " +
+                                    "(skew=${"%.1f".format(skew)} s), renovación única"
+                            )
+                            logDiag("403 → renovación de contexto (deriva=${skew}s)")
+                            edgeDrm.refreshMuid()
+                            connect()
+                            return
                         }
-                        Log.w(
-                            TAG,
-                            "403 en handshake: deriva ajustada " +
-                                "(skew=${"%.1f".format(clockSkewSeconds)} s), renovación única"
-                        )
-                        logDiag("403 → renovación de contexto (deriva=${clockSkewSeconds}s)")
-                        connect()
-                        return
                     }
                     logDiag(
                         "FALLO HTTP $code · cuerpo=${AudioFrameParser.truncate(summary, 120)}"
@@ -416,57 +419,9 @@ class EdgeProtocolClient(
     companion object {
         private const val TAG = "EdgeTtsClient"
 
-        /** Segundos entre el epoch FILETIME de Windows (1601-01-01) y el Unix (1970-01-01). */
-        private const val WIN_EPOCH_SECONDS: Long = 11_644_473_600L
-
-        /** Ticks de 100 nanosegundos por segundo (formato FILETIME). */
-        private const val TICKS_PER_SECOND: Long = 10_000_000L
-
-        /** Deriva de reloj ajustada con la cabecera Date del servidor (DRM). */
-        @Volatile
-        private var clockSkewSeconds: Double = 0.0
-
         private val WATCHDOG: ScheduledExecutorService =
             Executors.newSingleThreadScheduledExecutor { r ->
                 Thread(r, "edge-tts-watchdog").apply { isDaemon = true }
             }
-
-        private fun getUnixSeconds(): Long =
-            (System.currentTimeMillis() / 1000.0 + clockSkewSeconds).toLong()
-
-        /**
-         * Parsea una fecha RFC 2616 (cabecera `Date` del servidor) a segundos Unix.
-         */
-        private fun parseRfc2616Date(date: String): Long? = runCatching {
-            val fmt = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
-            fmt.timeZone = TimeZone.getTimeZone("GMT")
-            fmt.parse(date.trim())?.time?.div(1000)
-        }.getOrNull()
-
-        /**
-         * Token anti-abuso Sec-MS-GEC — réplica EXACTA del algoritmo real
-         * (edge_tts/drm.py → generate_sec_ms_gec), verificada contra la fuente.
-         *
-         * SHA-256, en hexadecimal MAYÚSCULAS, de la concatenación:
-         *   "{ticks}{TrustedClientToken}"
-         * donde ticks = (hora Unix + epoch FILETIME 1601) redondeada hacia
-         * abajo al intervalo de 5 minutos y convertida a ticks de 100 ns.
-         *
-         * IMPORTANTE: la versión de cliente NO forma parte del hash; solo se
-         * envía como el parámetro independiente Sec-MS-GEC-Version.
-         */
-        fun generateSecMsGec(
-            unixSeconds: Long,
-            trustedClientToken: String
-        ): String {
-            var ticks = unixSeconds
-            ticks += WIN_EPOCH_SECONDS      // → epoch FILETIME (segundos desde 1601)
-            ticks -= ticks % 300            // redondear al intervalo de 5 minutos
-            ticks *= TICKS_PER_SECOND       // segundos → ticks de 100 ns
-            val raw = "$ticks$trustedClientToken"   // SIN la versión
-            val digest = MessageDigest.getInstance("SHA-256")
-                .digest(raw.toByteArray(Charsets.US_ASCII))
-            return digest.joinToString("") { "%02x".format(it) }.uppercase(Locale.US)
-        }
     }
 }

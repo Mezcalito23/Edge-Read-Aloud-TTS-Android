@@ -5,11 +5,11 @@ import okhttp3.Request
 import org.json.JSONArray
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Descarga y analiza el catálogo JSON de voces de Edge con org.json.
- * Si la red falla, se usa la copia local y, en última instancia, una entrada
- * de respaldo para es-MX-DaliaNeural: la app nunca queda sin voces.
+ * Según V-3.1.md Sección 7: memoización volátil, escritura atómica, reintento 403.
  */
 class VoiceCatalogRepository(
     private val client: OkHttpClient,
@@ -23,34 +23,95 @@ class VoiceCatalogRepository(
         val error: String?
     )
 
-    private val cacheFile = File(cacheDir, "voice_catalog.json")
+    // Constante compartida según V-3.1.md Sección 8
+    companion object {
+        const val CATALOG_FILENAME = "voice_catalog.json"
+        
+        val FALLBACK: List<EdgeVoice> = listOf(
+            EdgeVoice(
+                shortName = EdgeProtocolConstants.DEFAULT_VOICE,
+                locale = EdgeProtocolConstants.DEFAULT_LOCALE,
+                gender = "Female",
+                displayName = "Dalia · Español (México) [respaldo local]"
+            )
+        )
+    }
+
+    private val cacheFile = File(cacheDir, CATALOG_FILENAME)
+
+    /** Memoización volátil del catálogo válido (V-3.1.md Sección 7). */
+    @Volatile
+    private var memo: CatalogSnapshot? = null
+
+    data class CatalogSnapshot(
+        val voices: List<EdgeVoice>,
+        val timestamp: Long
+    )
 
     /** Bloqueante: llamar siempre fuera del hilo principal. */
-    fun refresh(): CatalogResult = try {
-        val request = Request.Builder()
-            .url(voicesListUrl)
-            .header("User-Agent", EdgeProtocolConstants.DEFAULT_USER_AGENT)
-            .build()
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw ProviderHttpException(response.code, "catálogo de voces")
+    fun refresh(): CatalogResult {
+        var retryCount = 0
+        var lastError: Throwable? = null
+
+        while (retryCount <= 1) {  // Máximo 1 reintento por 403
+            try {
+                val request = Request.Builder()
+                    .url(voicesListUrl)
+                    .header("User-Agent", EdgeProtocolConstants.DEFAULT_USER_AGENT)
+                    .build()
+                    
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        // Reintento único ante 403 (ajuste de reloj externo)
+                        if (response.code == 403 && retryCount == 0) {
+                            retryCount++
+                            lastError = ProviderHttpException(response.code, "catálogo de voces")
+                            continue  // Reintentar una vez
+                        }
+                        throw ProviderHttpException(response.code, "catálogo de voces")
+                    }
+                    
+                    val json = response.body?.string()
+                        ?: throw IOException("Respuesta sin cuerpo")
+                    
+                    val voices = parseCatalog(json)
+                    if (voices.isEmpty()) {
+                        throw IOException("Catálogo vacío o con formato desconocido")
+                    }
+                    
+                    // Escritura atómica: temporal → rename (V-3.1.md Sección 7)
+                    writeAtomically(json)
+                    
+                    // Actualizar memo volátil
+                    memo = CatalogSnapshot(voices, System.currentTimeMillis())
+                    
+                    return CatalogResult(voices, fromNetwork = true, error = null)
+                }
+            } catch (t: Throwable) {
+                lastError = t
+                if (retryCount >= 1) break  // Ya reintentamos
+                if (t is ProviderHttpException && t.code == 403) {
+                    retryCount++
+                    continue
+                }
+                break
             }
-            val json = response.body?.string()
-                ?: throw IOException("Respuesta sin cuerpo")
-            val voices = parseCatalog(json)
-            if (voices.isEmpty()) throw IOException("Catálogo vacío o con formato desconocido")
-            runCatching {
-                cacheFile.parentFile?.mkdirs()
-                cacheFile.writeText(json)
-            }
-            CatalogResult(voices, fromNetwork = true, error = null)
         }
-    } catch (t: Throwable) {
-        CatalogResult(
+
+        // Falló todo: retornar caché o fallback
+        return CatalogResult(
             voices = cached().ifEmpty { FALLBACK },
             fromNetwork = false,
-            error = ErrorMapper.spanish(t)
+            error = ErrorMapper.spanish(lastError ?: IOException("Desconocido"))
         )
+    }
+
+    /** Escritura atómica mediante archivo temporal + rename (V-3.1.md Sección 7). */
+    private fun writeAtomically(json: String) {
+        val tempFile = File(cacheFile.parentFile, "${cacheFile.name}.tmp")
+        tempFile.parentFile?.mkdirs()
+        tempFile.writeText(json)
+        tempFile.renameTo(cacheFile)
     }
 
     /** Copia local (última descarga válida) o lista vacía. No lanza. */
@@ -86,15 +147,4 @@ class VoiceCatalogRepository(
 
     private fun JSONArray.toStringList(): List<String> =
         (0 until length()).mapNotNull { i -> optString(i).takeIf { it.isNotBlank() } }
-
-    companion object {
-        val FALLBACK: List<EdgeVoice> = listOf(
-            EdgeVoice(
-                shortName = EdgeProtocolConstants.DEFAULT_VOICE,
-                locale = EdgeProtocolConstants.DEFAULT_LOCALE,
-                gender = "Female",
-                displayName = "Dalia · Español (México) [respaldo local]"
-            )
-        )
-    }
 }
