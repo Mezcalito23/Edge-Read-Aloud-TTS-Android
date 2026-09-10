@@ -21,9 +21,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Cliente WebSocket del protocolo no oficial. DRM, sesgo de reloj y
- * cabeceras salen de [EdgeDrm]; el diagnóstico se acumula en memoria y
- * se persiste una sola vez al terminar, fuera del hilo de OkHttp.
+ * Cliente WebSocket persistente: un socket para varios turnos SSML
+ * (varios `onSynthesizeText` de Neo/Books). DRM y cabeceras salen de
+ * [EdgeDrm]. El socket no se cierra en `turn.end`; si el servidor lo tira,
+ * el siguiente turno reconecta.
  */
 class EdgeProtocolClient(
     private val client: OkHttpClient,
@@ -36,6 +37,32 @@ class EdgeProtocolClient(
     private val outputFormat: String = EdgeProtocolConstants.OUTPUT_FORMAT_MP3,
     private val onDiagnostic: ((String) -> Unit)? = null
 ) : TtsProvider {
+
+    val fingerprint: ConnectionFingerprint = ConnectionFingerprint(
+        wsUrl = wsBaseUrl,
+        userAgent = userAgent,
+        origin = origin,
+        outputFormat = outputFormat,
+        token = trustedClientToken
+    )
+
+    @Volatile
+    var lastReuse: Boolean = false
+        private set
+
+    private val connLock = Any()
+
+    @Volatile
+    private var socket: WebSocket? = null
+
+    @Volatile
+    private var connectionOpen = false
+
+    @Volatile
+    private var current: Session? = null
+
+    private var connectionId: String = newId()
+    private var muid: String = drm.newMuid()
 
     override fun synthesize(
         text: String,
@@ -70,8 +97,18 @@ class EdgeProtocolClient(
         return PreparedTurn(session)
     }
 
+    fun shutdown() {
+        synchronized(connLock) {
+            connectionOpen = false
+            current = null
+            val s = socket
+            socket = null
+            runCatching { s?.close(1000, "shutdown") }
+        }
+    }
+
     inner class PreparedTurn internal constructor(private val session: Session) : Cancellable {
-        fun start() = session.connect()
+        fun start() = session.begin()
         override fun cancel() = session.cancel()
     }
 
@@ -86,12 +123,7 @@ class EdgeProtocolClient(
         private val onError: (Throwable) -> Unit,
         private val onAudioMetadata: (String) -> Unit
     ) {
-
-        private val requestId = UUID.randomUUID().toString().replace("-", "")
-        private val connectionId = UUID.randomUUID().toString().replace("-", "")
-
-        @Volatile
-        private var muid = drm.newMuid()
+        private val requestId = newId()
 
         private val finished = AtomicBoolean(false)
         private val cancelled = AtomicBoolean(false)
@@ -103,9 +135,9 @@ class EdgeProtocolClient(
         private val binaryFramesSeen = AtomicInteger(0)
         private val pathSequence = ArrayList<String>()
 
-        @Volatile
-        private var socket: WebSocket? = null
         private var watchdog: ScheduledFuture<*>? = null
+
+        fun isDone(): Boolean = finished.get() || cancelled.get()
 
         private fun logDiag(line: String) {
             diagLines += line
@@ -117,29 +149,51 @@ class EdgeProtocolClient(
             DIAG_IO.execute { onDiagnostic?.invoke(text) }
         }
 
-        fun connect() {
+        fun begin() {
+            synchronized(connLock) {
+                current = this
+                val open = socket
+                if (connectionOpen && open != null) {
+                    lastReuse = true
+                    AppLog.i(TAG) { "persist hit request=$requestId" }
+                    logDiag("persist=hit")
+                    scheduleWatchdog()
+                    if (!open.send(ssmlFrame())) {
+                        dropSocketLocked()
+                        lastReuse = false
+                        AppLog.i(TAG) { "persist send failed, reconnecting" }
+                        connectLocked()
+                    }
+                    return
+                }
+                lastReuse = false
+                AppLog.i(TAG) { "persist miss, connecting request=$requestId" }
+                logDiag("persist=miss")
+                connectLocked()
+            }
+        }
+
+        private fun connectLocked() {
+            connectionId = newId()
+            muid = drm.newMuid()
             val nowSeconds = drm.unixSeconds()
             val gec = drm.generateSecMsGec(nowSeconds, trustedClientToken)
             val url = drm.websocketUrl(
                 wsBaseUrl, connectionId, trustedClientToken, secMsGecVersion, nowSeconds
             )
-
             val request = Request.Builder().url(url)
             for ((k, v) in drm.handshakeHeaders(userAgent, origin, muid)) {
                 request.header(k, v)
             }
-
             logDiag(
                 drm.handshakeDiagLine(
                     gec, muid, origin, userAgent, secMsGecVersion,
                     attempts.get() + 1 + gecRefreshes.get()
                 )
             )
-
             if (EdgeProtocolConstants.DEBUG_PROTOCOL) {
                 Log.d(TAG, "handshake: formato=$outputFormat voz=$voice")
             }
-
             socket = client.newWebSocket(request.build(), listener)
             scheduleWatchdog()
         }
@@ -147,8 +201,141 @@ class EdgeProtocolClient(
         fun cancel() {
             if (!cancelled.compareAndSet(false, true)) return
             watchdog?.cancel(false)
-            runCatching { socket?.cancel() }
+            synchronized(connLock) { dropSocketLocked() }
             fail(SynthesisCancelledException())
+        }
+
+        fun onSocketOpen(webSocket: WebSocket) {
+            bumpWatchdog()
+            webSocket.send(speechConfigFrame())
+            webSocket.send(ssmlFrame())
+        }
+
+        fun onText(text: String) {
+            bumpWatchdog()
+            val headers = AudioFrameParser.parseTextFrameHeaders(text)
+            val path = AudioFrameParser.pathOf(headers)
+            if (path != null) synchronized(pathSequence) { pathSequence += path }
+            when (path) {
+                EdgeProtocolConstants.PATH_TURN_START ->
+                    AppLog.i(TAG) { "turn.start recibido persist=${if (lastReuse) "hit" else "miss"}" }
+
+                EdgeProtocolConstants.PATH_TURN_END -> {
+                    if (receivedAudio.get()) {
+                        finishOk()
+                    } else {
+                        logDiag(
+                            "turn.end sin audio · frames binarios recibidos=" +
+                                binaryFramesSeen.get() + " · formato=$outputFormat"
+                        )
+                        fail(NoAudioReceivedException())
+                    }
+                }
+
+                EdgeProtocolConstants.PATH_AUDIO_METADATA -> {
+                    val body = AudioFrameParser.bodyOf(text)
+                    if (body.isNotEmpty()) onAudioMetadata(body)
+                }
+
+                EdgeProtocolConstants.PATH_RESPONSE -> {
+                    val body = AudioFrameParser.bodyOf(text)
+                    val status = STATUS_JSON.find(body)?.groupValues?.get(1)?.toIntOrNull()
+                    logDiag("Path:response status=${status ?: "n/d"} bytes=${body.length}")
+                    if (status != null && status >= 400) {
+                        fail(ProviderHttpException(status, "status $status"))
+                    }
+                }
+
+                else -> Unit
+            }
+        }
+
+        fun onBinary(bytes: ByteString) {
+            bumpWatchdog()
+            val n = binaryFramesSeen.incrementAndGet()
+            val frame = AudioFrameParser.parseBinaryFrame(bytes)
+            if (n <= 3) {
+                logDiag("binario#$n len=${bytes.size} path=${frame.path ?: "n/d"}")
+            }
+            if (frame.unexpectedAudioType()) {
+                logDiag(
+                    "Content-Type inesperado=${frame.contentType()} bytes=${frame.payloadLength}"
+                )
+            }
+            if (frame.path == EdgeProtocolConstants.PATH_AUDIO) {
+                if (frame.payloadLength > 0 && !cancelled.get()) {
+                    receivedAudio.set(true)
+                    onEncodedAudioChunk(frame.raw, frame.payloadOffset, frame.payloadLength)
+                }
+            } else if (frame.path == EdgeProtocolConstants.PATH_AUDIO_METADATA) {
+                val body = String(frame.payload, Charsets.UTF_8)
+                if (body.isNotEmpty()) onAudioMetadata(body)
+            }
+        }
+
+        fun onPeerClosed(code: Int, reason: String) {
+            if (finished.get() || cancelled.get()) return
+            val seq = synchronized(pathSequence) { pathSequence.toString() }
+            logDiag(
+                "EOF cierre=$code razón='${reason.take(40)}' · paths=[$seq]" +
+                    " · binarios=${binaryFramesSeen.get()} · audio=${receivedAudio.get()}" +
+                    " · formato=$outputFormat"
+            )
+            fail(
+                IOException(
+                    "EOF: el servidor cerró el WebSocket (código $code) " +
+                        "antes de completar la síntesis"
+                )
+            )
+        }
+
+        fun onPeerFailure(t: Throwable, response: Response?) {
+            if (finished.get() || cancelled.get()) return
+            val code = response?.code ?: -1
+            runCatching { response?.body?.close() }
+
+            if (code in EdgeProtocolConstants.PERMANENT_HTTP_ERRORS) {
+                if (code == 403 && !receivedAudio.get() &&
+                    gecRefreshes.getAndIncrement() == 0
+                ) {
+                    if (drm.tryUpdateSkewFromDate(response?.header("Date"))) {
+                        Log.w(
+                            TAG,
+                            "403 en handshake: deriva ajustada " +
+                                "(skew=${drm.skewSeconds()} s), renovación única"
+                        )
+                        logDiag("403 → renovación de contexto (deriva=${drm.skewSeconds()}s)")
+                        synchronized(connLock) {
+                            dropSocketLocked()
+                            connectLocked()
+                        }
+                        return
+                    }
+                    logDiag("403 → Date ausente o absurda, sin renovación")
+                }
+                logDiag("FALLO HTTP $code")
+                fail(ProviderHttpException(code, "HTTP $code"))
+                return
+            }
+
+            if (!receivedAudio.get() &&
+                attempts.incrementAndGet() <= EdgeProtocolConstants.MAX_AUTO_RETRIES
+            ) {
+                Log.w(TAG, "Fallo de red antes del audio: reintento único")
+                synchronized(connLock) {
+                    dropSocketLocked()
+                    connectLocked()
+                }
+                return
+            }
+
+            fail(
+                when {
+                    t is SocketTimeoutException -> t
+                    code > 0 -> ProviderHttpException(code, "HTTP $code")
+                    else -> t
+                }
+            )
         }
 
         private fun bumpWatchdog() {
@@ -160,7 +347,7 @@ class EdgeProtocolClient(
             watchdog?.cancel(false)
             watchdog = WATCHDOG.schedule(
                 {
-                    runCatching { socket?.cancel() }
+                    synchronized(connLock) { dropSocketLocked() }
                     fail(
                         TimeoutException(
                             "La síntesis estuvo " +
@@ -177,7 +364,9 @@ class EdgeProtocolClient(
         private fun finishOk() {
             if (!finished.compareAndSet(false, true)) return
             watchdog?.cancel(false)
-            runCatching { socket?.close(1000, "done") }
+            synchronized(connLock) {
+                if (current === this) current = null
+            }
             flushDiag()
             onComplete()
         }
@@ -185,178 +374,12 @@ class EdgeProtocolClient(
         private fun fail(t: Throwable) {
             if (!finished.compareAndSet(false, true)) return
             watchdog?.cancel(false)
-            runCatching { socket?.cancel() }
+            synchronized(connLock) {
+                if (current === this) current = null
+                if (t !is SynthesisCancelledException) dropSocketLocked()
+            }
             flushDiag()
             onError(t)
-        }
-
-        private val listener = object : WebSocketListener() {
-
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                webSocket.send(speechConfigFrame())
-                webSocket.send(ssmlFrame())
-            }
-
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                bumpWatchdog()
-                val headers = AudioFrameParser.parseTextFrameHeaders(text)
-                val path = AudioFrameParser.pathOf(headers)
-                if (path != null) synchronized(pathSequence) { pathSequence += path }
-                when (path) {
-                    EdgeProtocolConstants.PATH_TURN_START ->
-                        AppLog.i(TAG) { "turn.start recibido" }
-
-                    EdgeProtocolConstants.PATH_TURN_END -> {
-                        if (receivedAudio.get()) {
-                            finishOk()
-                        } else {
-                            logDiag(
-                                "turn.end sin audio · frames binarios recibidos=" +
-                                    binaryFramesSeen.get() + " · formato=$outputFormat"
-                            )
-                            fail(NoAudioReceivedException())
-                        }
-                    }
-
-                    EdgeProtocolConstants.PATH_AUDIO_METADATA -> {
-                        val body = AudioFrameParser.bodyOf(text)
-                        if (body.isNotEmpty()) onAudioMetadata(body)
-                    }
-
-                    EdgeProtocolConstants.PATH_RESPONSE -> {
-                        val body = AudioFrameParser.bodyOf(text)
-                        val status = STATUS_JSON.find(body)?.groupValues?.get(1)?.toIntOrNull()
-                        logDiag("Path:response status=${status ?: "n/d"} bytes=${body.length}")
-                        if (status != null && status >= 400) {
-                            fail(ProviderHttpException(status, "status $status"))
-                        }
-                    }
-
-                    else -> Unit
-                }
-            }
-
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                bumpWatchdog()
-                val n = binaryFramesSeen.incrementAndGet()
-                val frame = AudioFrameParser.parseBinaryFrame(bytes)
-                if (n <= 3) {
-                    logDiag("binario#$n len=${bytes.size} path=${frame.path ?: "n/d"}")
-                }
-                if (frame.unexpectedAudioType()) {
-                    logDiag(
-                        "Content-Type inesperado=${frame.contentType()} bytes=${frame.payloadLength}"
-                    )
-                }
-                if (frame.path == EdgeProtocolConstants.PATH_AUDIO) {
-                    if (frame.payloadLength > 0 && !cancelled.get()) {
-                        receivedAudio.set(true)
-                        onEncodedAudioChunk(frame.raw, frame.payloadOffset, frame.payloadLength)
-                    }
-                } else if (frame.path == EdgeProtocolConstants.PATH_AUDIO_METADATA) {
-                    val body = String(frame.payload, Charsets.UTF_8)
-                    if (body.isNotEmpty()) onAudioMetadata(body)
-                }
-            }
-
-            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                runCatching { webSocket.close(1000, null) }
-            }
-
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                if (!finished.get() && !cancelled.get()) {
-                    val seq = synchronized(pathSequence) { pathSequence.toString() }
-                    logDiag(
-                        "EOF cierre=$code razón='${reason.take(40)}' · paths=[$seq]" +
-                            " · binarios=${binaryFramesSeen.get()} · audio=${receivedAudio.get()}" +
-                            " · formato=$outputFormat"
-                    )
-                    fail(
-                        IOException(
-                            "EOF: el servidor cerró el WebSocket (código $code) " +
-                                "antes de completar la síntesis"
-                        )
-                    )
-                }
-            }
-
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                if (finished.get() || cancelled.get()) return
-
-                val code = response?.code ?: -1
-                runCatching { response?.body?.close() }
-
-                if (code in EdgeProtocolConstants.PERMANENT_HTTP_ERRORS) {
-                    if (code == 403 && !receivedAudio.get() &&
-                        gecRefreshes.getAndIncrement() == 0
-                    ) {
-                        if (drm.tryUpdateSkewFromDate(response?.header("Date"))) {
-                            Log.w(
-                                TAG,
-                                "403 en handshake: deriva ajustada " +
-                                    "(skew=${drm.skewSeconds()} s), renovación única"
-                            )
-                            logDiag("403 → renovación de contexto (deriva=${drm.skewSeconds()}s)")
-                            muid = drm.newMuid()
-                            connect()
-                            return
-                        }
-                        logDiag("403 → Date ausente o absurda, sin renovación")
-                    }
-                    logDiag("FALLO HTTP $code")
-                    fail(ProviderHttpException(code, "HTTP $code"))
-                    return
-                }
-
-                if (!receivedAudio.get() &&
-                    attempts.incrementAndGet() <= EdgeProtocolConstants.MAX_AUTO_RETRIES
-                ) {
-                    Log.w(TAG, "Fallo de red antes del audio: reintento único")
-                    muid = drm.newMuid()
-                    connect()
-                    return
-                }
-
-                fail(
-                    when {
-                        t is SocketTimeoutException -> t
-                        code > 0 -> ProviderHttpException(code, "HTTP $code")
-                        else -> t
-                    }
-                )
-            }
-        }
-
-        private fun speechConfigFrame(): String {
-            val config = JSONObject()
-                .put(
-                    "context",
-                    JSONObject().put(
-                        "synthesis",
-                        JSONObject().put(
-                            "audio",
-                            JSONObject()
-                                .put(
-                                    "metadataoptions",
-                                    JSONObject()
-                                        .put("sentenceBoundaryEnabled", "false")
-                                        .put("wordBoundaryEnabled", "false")
-                                )
-                                .put("outputFormat", outputFormat)
-                        )
-                    )
-                )
-            return buildString {
-                append("X-Timestamp:").append(drm.jsTimestamp(withTrailingZ = false))
-                append(EdgeProtocolConstants.CRLF)
-                append("Content-Type:application/json; charset=utf-8")
-                append(EdgeProtocolConstants.CRLF)
-                append("Path:").append(EdgeProtocolConstants.PATH_SPEECH_CONFIG)
-                append(EdgeProtocolConstants.CRLF)
-                append(EdgeProtocolConstants.CRLF)
-                append(config.toString())
-                append(EdgeProtocolConstants.CRLF)
-            }
         }
 
         private fun ssmlFrame(): String {
@@ -372,6 +395,94 @@ class EdgeProtocolClient(
                 append(EdgeProtocolConstants.CRLF)
                 append(EdgeProtocolConstants.CRLF)
                 append(ssml)
+            }
+        }
+    }
+
+    private fun dropSocketLocked() {
+        connectionOpen = false
+        val s = socket
+        socket = null
+        runCatching { s?.cancel() }
+    }
+
+    private fun speechConfigFrame(): String {
+        val config = JSONObject()
+            .put(
+                "context",
+                JSONObject().put(
+                    "synthesis",
+                    JSONObject().put(
+                        "audio",
+                        JSONObject()
+                            .put(
+                                "metadataoptions",
+                                JSONObject()
+                                    .put("sentenceBoundaryEnabled", "false")
+                                    .put("wordBoundaryEnabled", "false")
+                            )
+                            .put("outputFormat", outputFormat)
+                    )
+                )
+            )
+        return buildString {
+            append("X-Timestamp:").append(drm.jsTimestamp(withTrailingZ = false))
+            append(EdgeProtocolConstants.CRLF)
+            append("Content-Type:application/json; charset=utf-8")
+            append(EdgeProtocolConstants.CRLF)
+            append("Path:").append(EdgeProtocolConstants.PATH_SPEECH_CONFIG)
+            append(EdgeProtocolConstants.CRLF)
+            append(EdgeProtocolConstants.CRLF)
+            append(config.toString())
+            append(EdgeProtocolConstants.CRLF)
+        }
+    }
+
+    private val listener = object : WebSocketListener() {
+        override fun onOpen(webSocket: WebSocket, response: Response) {
+            synchronized(connLock) { connectionOpen = true }
+            current?.onSocketOpen(webSocket)
+        }
+
+        override fun onMessage(webSocket: WebSocket, text: String) {
+            current?.onText(text)
+        }
+
+        override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+            current?.onBinary(bytes)
+        }
+
+        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+            runCatching { webSocket.close(1000, null) }
+        }
+
+        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            val turn = current
+            synchronized(connLock) {
+                if (socket === webSocket) {
+                    connectionOpen = false
+                    socket = null
+                }
+            }
+            if (turn != null && !turn.isDone()) {
+                turn.onPeerClosed(code, reason)
+            } else {
+                AppLog.i(TAG) { "socket idle closed code=$code reason='${reason.take(40)}'" }
+            }
+        }
+
+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            val turn = current
+            synchronized(connLock) {
+                if (socket === webSocket) {
+                    connectionOpen = false
+                    socket = null
+                }
+            }
+            if (turn != null && !turn.isDone()) {
+                turn.onPeerFailure(t, response)
+            } else {
+                AppLog.i(TAG) { "socket idle failure ${t.javaClass.simpleName}" }
             }
         }
     }
@@ -392,5 +503,15 @@ class EdgeProtocolClient(
 
         fun generateSecMsGec(unixSeconds: Long, trustedClientToken: String): String =
             EdgeDrm.generateSecMsGec(unixSeconds, trustedClientToken)
+
+        fun newId(): String = UUID.randomUUID().toString().replace("-", "")
     }
+
+    data class ConnectionFingerprint(
+        val wsUrl: String,
+        val userAgent: String,
+        val origin: String,
+        val outputFormat: String,
+        val token: String
+    )
 }
