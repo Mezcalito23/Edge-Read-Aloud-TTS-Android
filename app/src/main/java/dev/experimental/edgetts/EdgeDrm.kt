@@ -56,16 +56,19 @@ class EdgeDrm(private val state: ProtocolState) {
 
     fun cookieHeader(muid: String): String = "muid=$muid;"
 
-    fun handshakeHeaders(userAgent: String, origin: String, muid: String): Map<String, String> =
-        linkedMapOf(
-            "User-Agent" to userAgent,
-            "Origin" to origin,
+    fun handshakeHeaders(userAgent: String, origin: String, muid: String): Map<String, String> {
+        val ua = userAgent.trim().ifBlank { EdgeProtocolConstants.DEFAULT_USER_AGENT }
+        val orig = origin.trim().ifBlank { EdgeProtocolConstants.DEFAULT_ORIGIN }
+        return linkedMapOf(
+            "User-Agent" to ua,
+            "Origin" to orig,
             "Pragma" to "no-cache",
             "Cache-Control" to "no-cache",
             "Accept-Encoding" to "gzip, deflate, br, zstd",
             "Accept-Language" to "en-US,en;q=0.9",
             "Cookie" to cookieHeader(muid)
         )
+    }
 
     fun jsTimestamp(withTrailingZ: Boolean = false): String {
         val fmt = SimpleDateFormat(

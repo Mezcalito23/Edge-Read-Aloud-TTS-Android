@@ -68,6 +68,16 @@ class EdgeDrmTest {
     }
 
     @Test
+    fun handshakeHeadersRejectBlankUaAndOrigin() {
+        val drm = EdgeDrm(ProtocolState())
+        val muid = drm.newMuid()
+        val headers = drm.handshakeHeaders("  ", "", muid)
+        assertEquals(EdgeProtocolConstants.DEFAULT_USER_AGENT, headers["User-Agent"])
+        assertEquals(EdgeProtocolConstants.DEFAULT_ORIGIN, headers["Origin"])
+        assertEquals(drm.cookieHeader(muid), headers["Cookie"])
+    }
+
+    @Test
     fun tryUpdateSkewFromDateRejectsNullBlankAndGarbage() {
         val drm = EdgeDrm(ProtocolState())
         assertFalse(drm.tryUpdateSkewFromDate(null, localEpochSeconds = unix))

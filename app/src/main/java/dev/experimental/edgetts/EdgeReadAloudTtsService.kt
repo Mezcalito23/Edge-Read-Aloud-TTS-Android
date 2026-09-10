@@ -72,10 +72,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             SharedProtocol.drm
         ) { settings?.snapshot() }
         cache = CacheRepository(app.cacheDir)
-        Thread({ catalog?.cached() }, "edge-tts-catalog-warm").apply {
-            isDaemon = true
-            start()
-        }
+        catalog?.cached()
 
         // Idioma inicial: el del dispositivo, si el catálogo lo cubre;
         // si no, español de México. Así el "idioma predeterminado" del motor
@@ -578,10 +575,23 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         stopRequested = false
         mp3Decoder.reset()
 
-        val text = request.charSequenceText?.toString()
+        val raw = request.charSequenceText?.toString()
 
         // Texto vacío o nulo: éxito silencioso sin tocar la red.
-        if (text.isNullOrBlank()) {
+        if (raw.isNullOrBlank()) {
+            runCatching {
+                callback.start(
+                    EdgeProtocolConstants.SAMPLE_RATE_HZ,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    EdgeProtocolConstants.CHANNEL_COUNT_MONO
+                )
+            }
+            guard.done(callback)
+            return
+        }
+
+        val text = TextSanitizer.removeIncompatibleCharacters(raw)
+        if (text.isBlank()) {
             runCatching {
                 callback.start(
                     EdgeProtocolConstants.SAMPLE_RATE_HZ,
@@ -739,8 +749,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             client,
             drm = SharedProtocol.drm,
             wsBaseUrl = snap.wsUrl,
-            userAgent = snap.userAgent,
-            origin = snap.origin,
+            userAgent = snap.userAgent.ifBlank { EdgeProtocolConstants.DEFAULT_USER_AGENT },
+            origin = snap.origin.ifBlank { EdgeProtocolConstants.DEFAULT_ORIGIN },
             outputFormat = outputFormat,
             onDiagnostic = { d -> runCatching { settings?.setHandshakeDebug(d) } }
         )

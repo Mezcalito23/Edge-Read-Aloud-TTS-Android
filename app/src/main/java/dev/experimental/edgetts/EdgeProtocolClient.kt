@@ -190,14 +190,11 @@ class EdgeProtocolClient(
 
                     EdgeProtocolConstants.PATH_RESPONSE -> {
                         val body = AudioFrameParser.bodyOf(text)
-                        logDiag(
-                            "Path:response → " +
-                                AudioFrameParser.truncate(body.ifBlank { "(vacío)" }, 160)
-                        )
                         val status = Regex("\"status\"\\s*:\\s*\"?(\\d{3})\"?")
                             .find(body)?.groupValues?.get(1)?.toIntOrNull()
+                        logDiag("Path:response status=${status ?: "n/d"} bytes=${body.length}")
                         if (status != null && status >= 400) {
-                            fail(ProviderHttpException(status, AudioFrameParser.truncate(body)))
+                            fail(ProviderHttpException(status, "status $status"))
                         }
                     }
 
@@ -208,13 +205,10 @@ class EdgeProtocolClient(
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 val raw = bytes.toByteArray()
                 val n = binaryFramesSeen.incrementAndGet()
-                if (n <= 3) {
-                    val head = raw.copyOfRange(0, minOf(24, raw.size))
-                    val hex = head.joinToString(" ") { "%02x".format(it) }
-                    logDiag("binario#$n len=${raw.size} hex=$hex")
-                }
-
                 val frame = AudioFrameParser.parseBinaryFrame(raw)
+                if (n <= 3) {
+                    logDiag("binario#$n len=${raw.size} path=${frame.path ?: "n/d"}")
+                }
                 if (frame.path == EdgeProtocolConstants.PATH_AUDIO) {
                     val payload = frame.payload
                     if (payload.isNotEmpty() && !cancelled.get()) {
@@ -249,10 +243,6 @@ class EdgeProtocolClient(
                 if (finished.get() || cancelled.get()) return
 
                 val code = response?.code ?: -1
-                val summary = runCatching { response?.peekBody(160)?.string() }
-                    .getOrNull()
-                    ?.let { AudioFrameParser.truncate(it) }
-                    ?: (t.message ?: "fallo de red")
                 runCatching { response?.body?.close() }
 
                 if (code in EdgeProtocolConstants.PERMANENT_HTTP_ERRORS) {
@@ -272,10 +262,8 @@ class EdgeProtocolClient(
                         }
                         logDiag("403 → Date ausente o absurda, sin renovación")
                     }
-                    logDiag(
-                        "FALLO HTTP $code · cuerpo=${AudioFrameParser.truncate(summary, 120)}"
-                    )
-                    fail(ProviderHttpException(code, summary))
+                    logDiag("FALLO HTTP $code")
+                    fail(ProviderHttpException(code, "HTTP $code"))
                     return
                 }
 
@@ -291,7 +279,7 @@ class EdgeProtocolClient(
                 fail(
                     when {
                         t is SocketTimeoutException -> t
-                        code > 0 -> ProviderHttpException(code, summary)
+                        code > 0 -> ProviderHttpException(code, "HTTP $code")
                         else -> t
                     }
                 )
