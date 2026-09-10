@@ -819,6 +819,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 onDiagnostic = { d -> runCatching { settings?.setHandshakeDebug(d) } }
             )
         }
+    }
 
     /**
      * Envía el PCM en bloques limitados. La cancelación se detecta en cada
