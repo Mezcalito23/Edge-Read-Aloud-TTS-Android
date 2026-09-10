@@ -235,8 +235,16 @@ class TerminalityTest {
         val callback = FakeCallback()
         val guard = TerminalGuard()
         guard.done(callback)
-        // error() through guard should be no-op
         guard.error(callback, "Error message")
+        assertEquals(1, callback.terminalCalls.get())
+    }
+
+    @Test
+    fun terminalGuardErrorWithCodeFiresOnce() {
+        val callback = FakeCallback()
+        val guard = TerminalGuard()
+        assertTrue(guard.error(callback, android.speech.tts.TextToSpeech.STOPPED))
+        assertFalse(guard.error(callback, android.speech.tts.TextToSpeech.ERROR))
         assertEquals(1, callback.terminalCalls.get())
     }
 }

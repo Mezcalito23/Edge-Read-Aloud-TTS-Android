@@ -67,6 +67,7 @@ dependencies {
 
     // org.json está incluido en Android SDK, pero para tests JVM necesitamos la librería externa
     testImplementation("org.json:json:20231013")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 
     // Pruebas unitarias (JVM) e instrumentadas (dispositivo/emulador).
     testImplementation("junit:junit:4.13.2")
