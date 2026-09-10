@@ -76,9 +76,12 @@ class SynthesisMetrics {
     var decodeMs: Long = 0
     var networkMs: Long = 0
     var mp3Bytes: Int = 0
+    var persistHits: Int = 0
+    var persistMisses: Int = 0
 
     fun line(): String =
         "métricas segs=$segments hit=$cacheHits miss=$cacheMisses" +
+            " persist=$persistHits/$persistMisses" +
             " decode=${decodeMs}ms red=${networkMs}ms mp3=${mp3Bytes}B"
 }
 

@@ -319,4 +319,24 @@ class ProtocolParsingTest {
         assertTrue(ErrorMapper.spanish(NoAudioReceivedException()).contains("no envió audio"))
         assertTrue(ErrorMapper.spanish(SynthesisCancelledException()).contains("cancelada"))
     }
+
+    @Test
+    fun connectionFingerprintIgnoresVoiceAndMatchesEndpoint() {
+        val a = EdgeProtocolClient.ConnectionFingerprint(
+            "wss://speech.example/tts", "ua", "origin", "audio-24khz-48kbitrate-mono-mp3", "tok"
+        )
+        assertEquals(a, a.copy())
+        assertTrue(a != a.copy(origin = "https://www.bing.com"))
+        assertTrue(a != a.copy(outputFormat = "other"))
+    }
+
+    @Test
+    fun metricsLineIncludesPersistCounters() {
+        val m = SynthesisMetrics()
+        m.persistHits = 3
+        m.persistMisses = 1
+        val line = m.line()
+        assertTrue(line.contains("persist=3/1"))
+        assertTrue(line.contains("métricas"))
+    }
 }

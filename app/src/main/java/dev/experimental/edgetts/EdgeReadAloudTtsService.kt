@@ -43,6 +43,12 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     private var active: Cancellable? = null
 
     @Volatile
+    private var protocol: EdgeProtocolClient? = null
+
+    @Volatile
+    private var protocolFp: EdgeProtocolClient.ConnectionFingerprint? = null
+
+    @Volatile
     private var stopRequested = false
 
     private val synthesisLock = Any()
@@ -85,6 +91,9 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         stopRequested = true
         mp3Decoder.cancel()
         active?.cancel()
+        protocol?.shutdown()
+        protocol = null
+        protocolFp = null
         super.onDestroy()
     }
 
@@ -730,15 +739,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val buffer = ByteArrayOutputStream()
 
         val client = http ?: return SegmentOutcome.Failed(tr(R.string.error_http_client))
-        val prov = EdgeProtocolClient(
-            client,
-            drm = SharedProtocol.drm,
-            wsBaseUrl = snap.wsUrl,
-            userAgent = snap.userAgent.ifBlank { EdgeProtocolConstants.DEFAULT_USER_AGENT },
-            origin = snap.origin.ifBlank { EdgeProtocolConstants.DEFAULT_ORIGIN },
-            outputFormat = outputFormat,
-            onDiagnostic = { d -> runCatching { settings?.setHandshakeDebug(d) } }
-        )
+        val prov = protocolFor(snap, outputFormat, client)
+            ?: return SegmentOutcome.Failed(tr(R.string.error_http_client))
 
         val netStart = android.os.SystemClock.elapsedRealtime()
         val handle = prov.prepare(
@@ -760,6 +762,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             return SegmentOutcome.Cancelled
         }
         handle.start()
+        if (prov.lastReuse) metrics.persistHits++ else metrics.persistMisses++
         var finished = false
         val deadline = android.os.SystemClock.elapsedRealtime() +
             EdgeProtocolConstants.SYNTHESIS_TIMEOUT_MS + 15_000L
@@ -800,6 +803,35 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             runCatching { cache?.writeMp3(cacheKey, mp3) }
         }
         return decoded
+    }
+
+    private fun protocolFor(
+        snap: SettingsStore.Snapshot,
+        outputFormat: String,
+        client: OkHttpClient
+    ): EdgeProtocolClient? {
+        val fp = EdgeProtocolClient.ConnectionFingerprint(
+            wsUrl = snap.wsUrl,
+            userAgent = snap.userAgent.ifBlank { EdgeProtocolConstants.DEFAULT_USER_AGENT },
+            origin = snap.origin.ifBlank { EdgeProtocolConstants.DEFAULT_ORIGIN },
+            outputFormat = outputFormat,
+            token = EdgeProtocolConstants.TRUSTED_CLIENT_TOKEN
+        )
+        val existing = protocol
+        if (existing != null && protocolFp == fp) return existing
+        existing?.shutdown()
+        val created = EdgeProtocolClient(
+            client,
+            drm = SharedProtocol.drm,
+            wsBaseUrl = fp.wsUrl,
+            userAgent = fp.userAgent,
+            origin = fp.origin,
+            outputFormat = fp.outputFormat,
+            onDiagnostic = { d -> runCatching { settings?.setHandshakeDebug(d) } }
+        )
+        protocol = created
+        protocolFp = fp
+        return created
     }
 
     /**
