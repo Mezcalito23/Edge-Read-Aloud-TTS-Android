@@ -23,7 +23,7 @@ interface TtsProvider {
         locale: String,
         rate: String,
         pitch: String,
-        onEncodedAudioChunk: (ByteArray) -> Unit,
+        onEncodedAudioChunk: (ByteArray, Int, Int) -> Unit,
         onComplete: () -> Unit,
         onError: (Throwable) -> Unit
     ): Cancellable

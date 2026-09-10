@@ -96,4 +96,16 @@ class TextSegmenterTest {
         assertTrue(operational.size > 1)
         assertTrue(TextSegmenter.OPERATIONAL_SEGMENT_CHARS < TextSegmenter.MAX_SEGMENT_CHARS)
     }
+
+    @Test
+    fun cjkIsSplitOnUtf8ByteLimitWithoutReplacementChar() {
+        val text = "中".repeat(1366)
+        val parts = TextSegmenter.segment(text)
+        assertEquals(text, parts.joinToString(""))
+        parts.forEach { part ->
+            assertTrue(part.toByteArray(Charsets.UTF_8).size <= TextSegmenter.MAX_SEGMENT_BYTES)
+            assertTrue(!part.contains('\uFFFD'))
+        }
+        assertTrue(parts.size >= 2)
+    }
 }

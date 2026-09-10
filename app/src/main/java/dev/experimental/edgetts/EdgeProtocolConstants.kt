@@ -12,17 +12,14 @@ package dev.experimental.edgetts
 object EdgeProtocolConstants {
 
     // ── Endpoints (configurables, nunca presentarlos como API oficial) ──────
+    const val TRUSTED_CLIENT_TOKEN: String = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
+
     const val VOICES_LIST_URL: String =
         "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list" +
-            "?trustedclienttoken=6A5AA1D4EAFF4E9FB37E23D68491D6F4"
+            "?trustedclienttoken=" + TRUSTED_CLIENT_TOKEN
 
     const val WS_BASE_URL: String =
         "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1"
-
-    // Token público ampliamente conocido del protocolo no oficial. No es una
-    // credencial privada nuestra; se conserva aquí solo para poder
-    // configurar/sustituir.
-    const val TRUSTED_CLIENT_TOKEN: String = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
 
     /**
      * [VERIFICADO] Versión de cliente para Sec-MS-GEC-Version. Debe
@@ -72,9 +69,6 @@ object EdgeProtocolConstants {
     /** [VERIFICADO] Formato primario: el único que usa el cliente de referencia. */
     const val OUTPUT_FORMAT_MP3: String = "audio-24khz-48kbitrate-mono-mp3"
 
-    /** Respaldo: PCM directo. El endpoint no lo produce (asigna el stream pero cierra sin audio). */
-    const val OUTPUT_FORMAT_RIFF_PCM: String = "riff-24khz-16bit-mono-pcm"
-
     const val SAMPLE_RATE_HZ: Int = 24000
 
     /**
@@ -94,12 +88,17 @@ object EdgeProtocolConstants {
     const val CONNECT_TIMEOUT_MS: Long = 15_000L
     const val READ_TIMEOUT_MS: Long = 30_000L
     const val PING_INTERVAL_MS: Long = 20_000L
+    /** Techo absoluto de una sesión (el watchdog de inactividad es más corto). */
     const val SYNTHESIS_TIMEOUT_MS: Long = 60_000L
+    /** Sin frames: abortar. Se reprograma en cada mensaje del servidor. */
+    const val IDLE_TIMEOUT_MS: Long = 20_000L
 
     /** Nunca más de un reintento automático, y solo si no se recibió audio. */
     const val MAX_AUTO_RETRIES: Int = 1
 
     const val MAX_SEGMENT_CHARS: Int = 4000
+    /** Tope protocolario rany2/edge-tts: split_text_by_byte_length(text, 4096). */
+    const val MAX_SEGMENT_BYTES: Int = 4096
 
     /** Errores permanentes: sin reintento automático (salvo renovación explícita). */
     val PERMANENT_HTTP_ERRORS: Set<Int> = setOf(401, 403, 404, 429)

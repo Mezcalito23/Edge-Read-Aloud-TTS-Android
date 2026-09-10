@@ -4,7 +4,7 @@ package dev.experimental.edgetts
  * Divide el texto en fragmentos aptos para el WebSocket:
  *  - conserva párrafos y su orden;
  *  - corta por puntuación (. ! ? … ; :) sin partir palabras;
- *  - ningún fragmento supera [MAX_SEGMENT_CHARS] (4.000) caracteres;
+ *  - ningún fragmento supera [MAX_SEGMENT_CHARS] caracteres ni [MAX_SEGMENT_BYTES] UTF-8;
  *  - admite cancelación cooperativa entre fragmentos.
  *
  * Nunca se envía un libro entero en una sola petición.
@@ -12,6 +12,7 @@ package dev.experimental.edgetts
 object TextSegmenter {
 
     const val MAX_SEGMENT_CHARS: Int = EdgeProtocolConstants.MAX_SEGMENT_CHARS
+    const val MAX_SEGMENT_BYTES: Int = EdgeProtocolConstants.MAX_SEGMENT_BYTES
 
     /** Tope operativo de Fase 3: primera audio más rápida y cancelación más fina. */
     const val OPERATIONAL_SEGMENT_CHARS: Int = 1200
@@ -24,7 +25,7 @@ object TextSegmenter {
     fun segment(text: String, isCancelled: () -> Boolean, maxChars: Int): List<String> {
         val limit = maxChars.coerceAtLeast(1).coerceAtMost(MAX_SEGMENT_CHARS)
         val result = ArrayList<String>()
-        val paragraphs = text.split(Regex("\\n+"))
+        val paragraphs = text.split(PARAGRAPH_SPLIT)
             .map { it.trim() }
             .filter { it.isNotEmpty() }
 
@@ -55,13 +56,14 @@ object TextSegmenter {
             if (current.isNotEmpty()) result += current.toString().trim()
         }
 
-        return result.filter { it.isNotBlank() }
+        if (isCancelled()) return result.filter { it.isNotBlank() }
+        return result.filter { it.isNotBlank() }.flatMap { enforceUtf8Limit(it) }
     }
 
     /** Corta por puntuación de fin de frase, dejando el signo en la frase anterior. */
     private fun splitSentences(paragraph: String): List<String> =
         paragraph
-            .split(Regex("(?<=[.!?…;:])\\s+"))
+            .split(SENTENCE_SPLIT)
             .map { it.trim() }
             .filter { it.isNotEmpty() }
 
@@ -77,7 +79,7 @@ object TextSegmenter {
             }
         }
 
-        for (clause in sentence.split(Regex("(?<=[,;])\\s+"))) {
+        for (clause in sentence.split(CLAUSE_SPLIT)) {
             if (clause.isEmpty()) continue
             if (pending.isNotEmpty() && pending.length + clause.length + 1 > limit) {
                 flush()
@@ -98,7 +100,7 @@ object TextSegmenter {
         val chunks = ArrayList<String>()
         val pending = StringBuilder()
 
-        for (piece in text.split(Regex("(?<=\\s)"))) {
+        for (piece in text.split(WORD_SPLIT)) {
             if (piece.isEmpty()) continue
 
             if (piece.length > limit) {
@@ -118,4 +120,29 @@ object TextSegmenter {
         if (pending.isNotEmpty()) chunks += pending.toString().trimEnd()
         return chunks
     }
+
+    private fun enforceUtf8Limit(text: String): List<String> {
+        val bytes = text.toByteArray(Charsets.UTF_8)
+        if (bytes.size <= MAX_SEGMENT_BYTES) return listOf(text)
+        val out = ArrayList<String>()
+        var offset = 0
+        while (offset < bytes.size) {
+            var end = minOf(offset + MAX_SEGMENT_BYTES, bytes.size)
+            while (end > offset && isUtf8Continuation(bytes[end - 1])) end--
+            if (end == offset) {
+                end = minOf(offset + 1, bytes.size)
+                while (end < bytes.size && isUtf8Continuation(bytes[end])) end++
+            }
+            out += String(bytes, offset, end - offset, Charsets.UTF_8)
+            offset = end
+        }
+        return out
+    }
+
+    private fun isUtf8Continuation(value: Byte): Boolean = (value.toInt() and 0xC0) == 0x80
+
+    private val PARAGRAPH_SPLIT = Regex("\\n+")
+    private val SENTENCE_SPLIT = Regex("(?<=[.!?…;:])\\s+")
+    private val CLAUSE_SPLIT = Regex("(?<=[,;])\\s+")
+    private val WORD_SPLIT = Regex("(?<=\\s)")
 }

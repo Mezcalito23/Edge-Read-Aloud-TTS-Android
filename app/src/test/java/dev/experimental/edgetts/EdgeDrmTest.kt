@@ -17,6 +17,7 @@ class EdgeDrmTest {
     fun generateSecMsGecMatchesKnownVector() {
         assertEquals(knownGec, EdgeDrm.generateSecMsGec(unix, token))
         assertEquals(knownGec, EdgeDrm(ProtocolState()).generateSecMsGec(unix, token))
+        assertEquals("B0ED", Hex.encode(byteArrayOf(0xB0.toByte(), 0xED.toByte()), upper = true))
     }
 
     @Test
