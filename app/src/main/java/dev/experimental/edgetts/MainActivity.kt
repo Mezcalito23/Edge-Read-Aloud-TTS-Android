@@ -486,6 +486,7 @@ class SettingsController(private val activity: Activity) {
                 // haya prendido en este cliente/ROM.
                 val testParams = Bundle().apply {
                     putString("voiceName", snap.voice)
+                    putString(VoiceResolver.OWN_PARAM, "1")
                 }
                 val spoken = tts.speak(
                     sample,
@@ -938,7 +939,7 @@ class SettingsController(private val activity: Activity) {
     }
 
     companion object {
-        private const val UTTERANCE_TEST = "edge-tts-test"
+        private const val UTTERANCE_TEST = VoiceResolver.OWN_UTTERANCE
 
         /** Refrescar el catálogo si lleva más de 7 días sin actualizarse. */
         private const val CATALOG_STALE_MS = 7L * 24 * 60 * 60 * 1000
