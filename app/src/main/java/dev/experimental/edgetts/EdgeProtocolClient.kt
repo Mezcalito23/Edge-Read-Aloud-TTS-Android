@@ -47,12 +47,31 @@ class EdgeProtocolClient(
         onComplete: () -> Unit,
         onError: (Throwable) -> Unit
     ): Cancellable {
-        val session = Session(text, voice, locale, rate, pitch, onEncodedAudioChunk, onComplete, onError)
-        session.connect()
-        return Cancellable { session.cancel() }
+        val turn = prepare(text, voice, locale, rate, pitch, onEncodedAudioChunk, onComplete, onError)
+        turn.start()
+        return turn
     }
 
-    private inner class Session(
+    fun prepare(
+        text: String,
+        voice: String,
+        locale: String,
+        rate: String,
+        pitch: String,
+        onEncodedAudioChunk: (ByteArray, Int, Int) -> Unit,
+        onComplete: () -> Unit,
+        onError: (Throwable) -> Unit
+    ): PreparedTurn {
+        val session = Session(text, voice, locale, rate, pitch, onEncodedAudioChunk, onComplete, onError)
+        return PreparedTurn(session)
+    }
+
+    inner class PreparedTurn internal constructor(private val session: Session) : Cancellable {
+        fun start() = session.connect()
+        override fun cancel() = session.cancel()
+    }
+
+    inner class Session(
         private val text: String,
         private val voice: String,
         private val locale: String,
@@ -209,15 +228,15 @@ class EdgeProtocolClient(
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 bumpWatchdog()
-                val raw = bytes.toByteArray()
                 val n = binaryFramesSeen.incrementAndGet()
-                val frame = AudioFrameParser.parseBinaryFrame(raw)
+                val frame = AudioFrameParser.parseBinaryFrame(bytes)
                 if (n <= 3) {
-                    logDiag("binario#$n len=${raw.size} path=${frame.path ?: "n/d"}")
+                    logDiag("binario#$n len=${bytes.size} path=${frame.path ?: "n/d"}")
                 }
-                val type = frame.contentType()?.lowercase()
-                if (type != null && type != "audio/mpeg" && type != "audio/mp3" && frame.payloadLength > 0) {
-                    logDiag("Content-Type inesperado=$type bytes=${frame.payloadLength}")
+                if (frame.unexpectedAudioType()) {
+                    logDiag(
+                        "Content-Type inesperado=${frame.contentType()} bytes=${frame.payloadLength}"
+                    )
                 }
                 if (frame.path == EdgeProtocolConstants.PATH_AUDIO) {
                     if (frame.payloadLength > 0 && !cancelled.get()) {

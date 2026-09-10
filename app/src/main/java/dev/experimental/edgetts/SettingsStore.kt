@@ -175,7 +175,6 @@ class SettingsStore(context: Context) {
     companion object {
         private const val MAX_DIAG_CHARS = 1500
 
-        val K_LOCALE = stringPreferencesKey("locale")
         val K_VOICE = stringPreferencesKey("voice")
         val K_RATE = intPreferencesKey("rate_percent")
         val K_PITCH = intPreferencesKey("pitch_hz")
