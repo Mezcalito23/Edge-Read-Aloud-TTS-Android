@@ -12,15 +12,17 @@ android {
         applicationId = "dev.experimental.edgetts"
         minSdk = 26
         targetSdk = 36
-        versionCode = 24
-        versionName = "0.8.5"
+        versionCode = 25
+        versionName = "0.9.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -40,7 +42,14 @@ android {
     }
 
     lint {
-        abortOnError = false
+        abortOnError = true
+        checkReleaseBuilds = true
+        disable += setOf(
+            "MissingApplicationIcon",
+            "IconMissingDensityFolder",
+            "GradleDependency",
+            "AndroidGradlePluginVersion"
+        )
     }
 }
 

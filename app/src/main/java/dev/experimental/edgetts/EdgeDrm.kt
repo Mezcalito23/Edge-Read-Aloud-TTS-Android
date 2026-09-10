@@ -149,8 +149,15 @@ class EdgeDrm(private val state: ProtocolState) {
     }
 }
 
-/** Instancia de proceso: el sesgo 403 del catálogo aplica también al WebSocket. */
+/** Instancia de proceso: DRM, sesgo 403 y el único OkHttpClient. */
 object SharedProtocol {
     val state: ProtocolState = ProtocolState()
     val drm: EdgeDrm = EdgeDrm(state)
+    val http: okhttp3.OkHttpClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            .connectTimeout(EdgeProtocolConstants.CONNECT_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .readTimeout(EdgeProtocolConstants.READ_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .pingInterval(EdgeProtocolConstants.PING_INTERVAL_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .build()
+    }
 }

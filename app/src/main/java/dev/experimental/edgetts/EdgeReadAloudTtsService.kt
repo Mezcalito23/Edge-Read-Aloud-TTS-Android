@@ -58,11 +58,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         super.onCreate()
         val app = applicationContext
 
-        val client = OkHttpClient.Builder()
-            .connectTimeout(EdgeProtocolConstants.CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            .readTimeout(EdgeProtocolConstants.READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            .pingInterval(EdgeProtocolConstants.PING_INTERVAL_MS, TimeUnit.MILLISECONDS)
-            .build()
+        val client = SharedProtocol.http
         http = client
         settings = SettingsStore(app)
         SettingsStore.ensureLoaded(app)
@@ -406,9 +402,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val configuredName = runCatching { settings?.snapshot()?.voice }
             .getOrNull() ?: EdgeProtocolConstants.DEFAULT_VOICE
         val catalogVoices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
-        // TODO el catálogo, con los locales reales: el framework busca aquí
-        // cualquier voz que un cliente pida (findVoice). Sin la voz pedida en
-        // esta lista, setVoice() se descarta en silencio.
         val list = if (catalogVoices.isEmpty()) {
             listOf(
                 EdgeVoice(
@@ -423,50 +416,20 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             TAG,
             "onGetVoices: exponiendo ${list.size} voces (configurada=$configuredName)"
         )
-        return list.map { edgeToAndroid(it, isDefault = it.shortName == configuredName) }
+        return list.map { edgeToAndroid(it) }
     }
 
     /**
-     * Construye un [Voice] Android. La voz configurada se marca como
-     * predeterminada vía el constructor oculto de 7 parámetros (isDefault);
-     * si la reflexión no está disponible, se degrada al constructor público
-     * de 6 y la predeterminada se resuelve igualmente por configuración.
-     *
-     * SOBRE requiresNetwork = false: Edge es un TTS de nube y técnicamente
-     * necesita red, pero marcar `true` hace que los clientes que filtran
-     * voces "usables sin conexión" —en particular Google Play Books en su
-     * modo "TTS offline/local"— descarten TODAS nuestras voces y caigan en
-     * Google TTS. Marcamos `false` para que el motor sea seleccionable por
-     * esos clientes; la síntesis seguirá requiriendo red y, si no la hay,
-     * fallará con un error claro.
+     * Constructor público de 6 parámetros. El default lo resuelve
+     * [onGetDefaultVoiceNameFor], no el flag oculto isDefault.
      */
-    private fun edgeToAndroid(v: EdgeVoice, isDefault: Boolean): Voice {
-        // forLanguageTag es tolerante: un locale mal formado del catálogo no
-        // lanza IllformedLocaleException, devuelve un locale "und" inocuo.
+    private fun edgeToAndroid(v: EdgeVoice): Voice {
         val locale = Locale.forLanguageTag(v.locale.ifBlank { "es-MX" })
-        return runCatching {
-            Voice::class.java.getConstructor(
-                String::class.java,
-                Locale::class.java,
-                Int::class.javaPrimitiveType,
-                Int::class.javaPrimitiveType,
-                Boolean::class.javaPrimitiveType,
-                Set::class.java,
-                Boolean::class.javaPrimitiveType
-            ).newInstance(
-                v.shortName, locale,
-                Voice.QUALITY_VERY_HIGH, Voice.LATENCY_HIGH,
-                /* requiresNetwork = */ false,
-                /* features = */ emptySet<String>(),
-                isDefault
-            )
-        }.getOrDefault(
-            Voice(
-                v.shortName, locale,
-                Voice.QUALITY_VERY_HIGH, Voice.LATENCY_HIGH,
-                /* requiresNetwork = */ false,
-                /* features = */ emptySet<String>()
-            )
+        return Voice(
+            v.shortName, locale,
+            Voice.QUALITY_VERY_HIGH, Voice.LATENCY_HIGH,
+            /* requiresNetwork = */ false,
+            /* features = */ emptySet<String>()
         )
     }
 
@@ -560,7 +523,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             runCatching { synthesizeInternal(request, callback, guard) }
                 .onFailure { t ->
                     Log.e(TAG, "fallo interno", t)
-                    guard.error(callback, ErrorMapper.spanish(t)) { msg ->
+                    guard.error(callback, mapped(t)) { msg ->
                         runCatching { settings?.setLastError(msg) }
                     }
                 }
@@ -605,14 +568,14 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
         val snap = settings?.snapshot()
         if (snap == null) {
-            guard.error(callback, "No se pudo leer la configuración local.")
+            guard.error(callback, tr(R.string.error_settings_unreadable))
             return
         }
 
         val segments = runCatching {
             TextSegmenter.segment(text, { stopRequested }, TextSegmenter.OPERATIONAL_SEGMENT_CHARS)
         }.getOrElse {
-            guard.error(callback, "No se pudo segmentar el texto.")
+            guard.error(callback, tr(R.string.error_segment_failed))
             return
         }
 
@@ -658,14 +621,14 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 when (val outcome = synthesizeSegment(segment, snap, voice, rate, pitch, metrics)) {
                     is SegmentOutcome.Ok -> {
                         if (!ensureStarted(outcome.sampleRateHz)) {
-                            guard.error(callback, "No se pudo iniciar el canal de audio.")
+                            guard.error(callback, tr(R.string.error_audio_start))
                             return
                         }
                         if (!deliver(outcome.pcm, callback)) {
                             if (stopRequested) {
                                 guard.error(callback, TextToSpeech.STOPPED)
                             } else {
-                                guard.error(callback, "No se pudo entregar el audio al sistema.") { msg ->
+                                guard.error(callback, tr(R.string.error_audio_deliver)) { msg ->
                                     runCatching { settings?.setLastError(msg) }
                                 }
                             }
@@ -749,7 +712,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             onSuccess = { SegmentOutcome.Ok(it.pcm, it.sampleRateHz) },
             onFailure = {
                 if (it is SynthesisCancelledException) SegmentOutcome.Cancelled
-                else SegmentOutcome.Failed(ErrorMapper.spanish(it))
+                else SegmentOutcome.Failed(mapped(it))
             }
         )
     }
@@ -769,7 +732,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         var failure: Throwable? = null
         val buffer = ByteArrayOutputStream()
 
-        val client = http ?: return SegmentOutcome.Failed("Cliente HTTP no inicializado.")
+        val client = http ?: return SegmentOutcome.Failed(tr(R.string.error_http_client))
         val prov: TtsProvider = EdgeProtocolClient(
             client,
             drm = SharedProtocol.drm,
@@ -807,18 +770,18 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
         if (!finished) {
             handle.cancel()
-            return SegmentOutcome.Failed(ErrorMapper.spanish(TimeoutExceptionShim()))
+            return SegmentOutcome.Failed(mapped(TimeoutExceptionShim()))
         }
 
         val t = failure
         if (t is SynthesisCancelledException) return SegmentOutcome.Cancelled
         if (t != null) {
-            return SegmentOutcome.Failed(ErrorMapper.spanish(t))
+            return SegmentOutcome.Failed(mapped(t))
         }
 
         val mp3 = synchronized(buffer) { buffer.toByteArray() }
         if (mp3.isEmpty()) {
-            return SegmentOutcome.Failed("El proveedor no devolvió audio (respuesta vacía).")
+            return SegmentOutcome.Failed(tr(R.string.error_empty_audio))
         }
         metrics.mp3Bytes += mp3.size
 
@@ -859,6 +822,12 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         java.util.concurrent.TimeoutException(
             "La síntesis superó el tiempo máximo permitido"
         )
+
+    private fun mapped(t: Throwable): String =
+        runCatching { ErrorMapper.localize(this, t) }.getOrElse { ErrorMapper.spanish(t) }
+
+    private fun tr(id: Int): String =
+        runCatching { getString(id) }.getOrDefault("")
 
     companion object {
         private const val TAG = "EdgeTtsService"

@@ -117,6 +117,38 @@ object ErrorMapper {
             "Error inesperado durante la síntesis: ${t.javaClass.simpleName}"
     }
 
+    fun localize(ctx: android.content.Context, t: Throwable): String = when {
+        t is SynthesisCancelledException ->
+            ctx.getString(R.string.error_cancelled)
+        t is UnsupportedAudioFormatException ->
+            ctx.getString(
+                R.string.error_undecodable,
+                t.message?.take(160) ?: ctx.getString(R.string.error_format_unknown)
+            )
+        t is NoAudioReceivedException ->
+            ctx.getString(R.string.error_no_audio)
+        t is ProviderHttpException ->
+            httpLocalized(ctx, t.code, t.summary)
+        t is TimeoutException || t is SocketTimeoutException ->
+            ctx.getString(R.string.error_timeout)
+        t is IOException && t.message.orEmpty().startsWith("EOF") ->
+            ctx.getString(R.string.error_eof)
+        t is IOException ->
+            ctx.getString(R.string.error_io, t.message?.take(80) ?: ctx.getString(R.string.error_no_detail))
+        else ->
+            ctx.getString(R.string.error_unexpected, t.javaClass.simpleName)
+    }
+
+    private fun httpLocalized(ctx: android.content.Context, code: Int, summary: String): String = when (code) {
+        400 -> ctx.getString(R.string.error_http_400)
+        401 -> ctx.getString(R.string.error_http_401)
+        403 -> ctx.getString(R.string.error_http_403)
+        404 -> ctx.getString(R.string.error_http_404)
+        429 -> ctx.getString(R.string.error_http_429)
+        in 500..599 -> ctx.getString(R.string.error_http_5xx, code)
+        else -> ctx.getString(R.string.error_http_other, code, summary.take(60))
+    }
+
     private fun httpMessage(code: Int, summary: String): String = when (code) {
         400 -> "HTTP 400: SSML o formato inválido; el proveedor rechazó la petición."
         401 -> "HTTP 401: contexto o autenticación inválida; el protocolo pudo haber cambiado."

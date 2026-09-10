@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Necesario para el WebSocket de síntesis y el catálogo de voces. -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -15,8 +16,10 @@
     <application
         android:allowBackup="false"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
         android:supportsRtl="true"
-        android:theme="@style/Theme.EdgeTts">
+        android:theme="@style/Theme.EdgeTts"
+        tools:targetApi="33">
 
         <activity
             android:name=".MainActivity"
@@ -41,7 +44,6 @@
              Google TTS sin siquiera probar el motor. -->
         <activity
             android:name=".CheckVoiceData"
-            android:directBootAware="true"
             android:exported="true"
             android:theme="@android:style/Theme.NoDisplay">
             <intent-filter>
