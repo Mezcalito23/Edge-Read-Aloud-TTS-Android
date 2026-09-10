@@ -85,4 +85,16 @@ class TextSanitizerTest {
         assertTrue(result.contains("Line2"))
         assertTrue(result.contains("Paragraph2"))
     }
+
+    @Test
+    fun escapeXmlEscapesTheFiveCharactersAndReplacesIllegalCodePoints() {
+        val amp = "\u0026"
+        assertEquals(
+            "5 ${amp}lt; 6 ${amp}amp;${amp}amp; 7 ${amp}gt; 3, ${amp}quot;comillas${amp}quot;, ${amp}apos;apóstrofe${amp}apos;",
+            TextSanitizer.escapeXml("5 < 6 && 7 > 3, \"comillas\", 'apóstrofe'")
+        )
+        assertEquals("${amp}amp;lt;", TextSanitizer.escapeXml("${amp}lt;"))
+        assertEquals("\uFFFD", TextSanitizer.escapeXml("\uD800"))
+        assertEquals("😀", TextSanitizer.escapeXml("😀"))
+    }
 }

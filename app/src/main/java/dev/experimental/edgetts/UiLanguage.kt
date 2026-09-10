@@ -22,7 +22,8 @@ object UiLanguage {
     /** Contexto con el idioma guardado, o el original si es "sistema". */
     fun wrap(base: Context): Context {
         val saved = runCatching {
-            SettingsStore(base).snapshotBlocking().uiLanguage
+            SettingsStore.ensureLoaded(base)
+            SettingsStore(base).snapshot().uiLanguage
         }.getOrDefault("")
         if (saved.isBlank()) return base
 

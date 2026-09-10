@@ -94,7 +94,9 @@ class SettingsController(private val activity: Activity) {
             .connectTimeout(EdgeProtocolConstants.CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
             .readTimeout(EdgeProtocolConstants.READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
             .build(),
-        activity.cacheDir
+        activity.cacheDir,
+        SharedProtocol.drm,
+        snapshotProvider = { store.snapshot() }
     )
 
     private val io: ExecutorService = Executors.newFixedThreadPool(2)
@@ -208,14 +210,14 @@ class SettingsController(private val activity: Activity) {
         // voz (0). Se persisten en SettingsStore y los respeta el motor.
         sliderRate.max = SLIDER_RANGE
         sliderPitch.max = SLIDER_RANGE
-        sliderRate.setOnSeekBarChangeListener(seekListener { value, _ ->
-            store.setRate(value)
-            labelRateValue.text = formatPercent(value)
-        })
-        sliderPitch.setOnSeekBarChangeListener(seekListener { value, _ ->
-            store.setPitch(value)
-            labelPitchValue.text = formatHertz(value)
-        })
+        sliderRate.setOnSeekBarChangeListener(sliderListener(
+            preview = { labelRateValue.text = formatPercent(it) },
+            persist = { store.setRate(it) }
+        ))
+        sliderPitch.setOnSeekBarChangeListener(sliderListener(
+            preview = { labelPitchValue.text = formatHertz(it) },
+            persist = { store.setPitch(it) }
+        ))
 
         // Modo de voz unificada: la voz de la app manda para todo su idioma.
         switchUnifiedVoice.setOnCheckedChangeListener { _, checked ->
@@ -241,7 +243,7 @@ class SettingsController(private val activity: Activity) {
             override fun onItemSelected(p: android.widget.AdapterView<*>?, v: View?, pos: Int, id: Long) {
                 if (programmaticEdit) return
                 val code = UiLanguage.codeOf(pos)
-                if (code != store.snapshotBlocking().uiLanguage) {
+                if (code != store.snapshot().uiLanguage) {
                     store.setUiLanguage(code)
                     activity.recreate()
                 }
@@ -262,7 +264,7 @@ class SettingsController(private val activity: Activity) {
     fun refreshAll() {
         statusEngine.text = activity.getString(R.string.status_declared_checking)
         io.execute {
-            val snap = store.snapshotBlocking()
+            val snap = store.snapshot()
             val cached = catalog.cached()
             val voices = cached.ifEmpty { VoiceCatalogRepository.FALLBACK }
             val declared = isEngineDeclared()
@@ -289,7 +291,7 @@ class SettingsController(private val activity: Activity) {
             val result = catalog.refresh()
             if (!result.fromNetwork) return@execute
             store.setCatalogUpdatedAt(System.currentTimeMillis())
-            val snap = store.snapshotBlocking()
+            val snap = store.snapshot()
             main.post {
                 renderVoices(result.voices, snap.voice)
                 labelVoiceCount.text = activity.getString(
@@ -337,7 +339,7 @@ class SettingsController(private val activity: Activity) {
         io.execute {
             val result = catalog.refresh()
             if (result.fromNetwork) store.setCatalogUpdatedAt(System.currentTimeMillis())
-            val snap = store.snapshotBlocking()
+            val snap = store.snapshot()
             main.post {
                 btnRefreshCatalog.isEnabled = true
                 renderVoices(result.voices, snap.voice)
@@ -389,7 +391,7 @@ class SettingsController(private val activity: Activity) {
      * catálogo y se carga la muestra correspondiente.
      */
     private fun testVoice() {
-        val snap = store.snapshotBlocking()
+        val snap = store.snapshot()
         releaseTts()
         statusProvider.text = activity.getString(R.string.test_starting)
         btnTestVoice.isEnabled = false
@@ -462,7 +464,7 @@ class SettingsController(private val activity: Activity) {
                         main.post {
                             btnTestVoice.isEnabled = true
                             store.clearLastError()
-                            renderLastError(store.snapshotBlocking())
+                            renderLastError(store.snapshot())
                             statusProvider.text = activity.getString(R.string.test_ok)
                         }
                     }
@@ -470,14 +472,14 @@ class SettingsController(private val activity: Activity) {
                     override fun onError(utteranceId: String?) {
                         main.post {
                             btnTestVoice.isEnabled = true
-                            val snap = store.snapshotBlocking()
+                            val snap = store.snapshot()
                             if (snap.lastError.isBlank()) store.setLastError(
                                 activity.getString(R.string.test_failed_generic)
                             )
-                            renderLastError(store.snapshotBlocking())
+                            renderLastError(store.snapshot())
                             statusProvider.text = activity.getString(
                                 R.string.test_failed_fmt,
-                                store.snapshotBlocking().lastError
+                                store.snapshot().lastError
                             )
                         }
                     }
@@ -586,7 +588,7 @@ class SettingsController(private val activity: Activity) {
      * el TrustedClientToken ni el Sec-MS-GEC reales.
      */
     private fun refreshEndpointsCard() {
-        val snap = store.snapshotBlocking()
+        val snap = store.snapshot()
         textEndpoints.text = buildString {
             append(activity.getString(R.string.ep_voices)).append(" : ")
                 .append(mask(snap.voicesUrl)).append('\n')
@@ -606,7 +608,7 @@ class SettingsController(private val activity: Activity) {
     // ── Diálogos de ajuste fino (sin recompilar) ────────────────────────────
 
     private fun editUserAgent() {
-        val current = store.snapshotBlocking().userAgent
+        val current = store.snapshot().userAgent
         val input = EditText(activity).apply {
             setText(current)
             setSelection(current.length)
@@ -671,7 +673,7 @@ class SettingsController(private val activity: Activity) {
      * probar chrome-extension://… vs https://www.bing.com sin recompilar.
      */
     private fun editOrigin() {
-        val current = store.snapshotBlocking().origin
+        val current = store.snapshot().origin
         val input = EditText(activity).apply {
             setText(current)
             setSelection(current.length)
@@ -866,21 +868,23 @@ class SettingsController(private val activity: Activity) {
     }
 
     /**
-     * Listener de slider: convierte progress (0..100) a valor (-50..+50) y lo
-     * persiste. Solo actúa al soltar (onStopTrackingTouch) para no escribir en
-     * DataStore en cada píxel de arrastre; el arrastre actualiza la etiqueta.
+     * Preview en cada pixel; persistencia una sola vez al soltar.
      */
-    private fun seekListener(onValue: (value: Int, fromUser: Boolean) -> Unit) =
-        object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) onValue(progress - SLIDER_OFFSET, true)
-            }
-
-            override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                onValue(seekBar.progress - SLIDER_OFFSET, false)
-            }
+    private fun sliderListener(
+        preview: (value: Int) -> Unit,
+        persist: (value: Int) -> Unit
+    ) = object : SeekBar.OnSeekBarChangeListener {
+        override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+            if (fromUser) preview(progress - SLIDER_OFFSET)
         }
+
+        override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+        override fun onStopTrackingTouch(seekBar: SeekBar) {
+            val value = seekBar.progress - SLIDER_OFFSET
+            preview(value)
+            persist(value)
+        }
+    }
 
     /** "+0%", "+25%", "-10%"… */
     private fun formatPercent(value: Int): String =

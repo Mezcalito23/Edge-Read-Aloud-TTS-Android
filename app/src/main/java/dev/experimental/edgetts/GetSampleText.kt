@@ -70,17 +70,7 @@ class GetSampleText : Activity() {
 
     private fun iso2Language(code: String): String {
         val lower = code.lowercase(Locale.ROOT)
-        return if (lower.length == 2) lower else iso3ToIso2(lower)
-    }
-
-    private fun iso3ToIso2(code: String): String {
-        if (code.length != 3) return code
-        for (iso2 in Locale.getISOLanguages()) {
-            runCatching {
-                if (Locale.forLanguageTag(iso2).isO3Language.equals(code, ignoreCase = true)) return iso2
-            }
-        }
-        return code
+        return if (lower.length == 2) lower else LocaleCodes.iso3ToIso2LangOrSelf(lower)
     }
 
     companion object {
