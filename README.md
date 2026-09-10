@@ -76,9 +76,10 @@ threads.
    ./gradlew assembleRelease
    ```
 
-   ProGuard keeps the TTS service and engine contract activities. After
-   installing a release APK, verify that Settings still lists the engine,
-   the catalog loads, and synthesis works.
+   ProGuard keeps the TTS service and engine contract activities. The release
+   build is signed with the debug key so you can `installRelease` locally;
+   replace `signingConfig` before any store upload. After installing, verify
+   that Settings still lists the engine, the catalog loads, and synthesis works.
 
 5. **Instrumented tests** (require a device/emulator with API 26+, no real network):
 
