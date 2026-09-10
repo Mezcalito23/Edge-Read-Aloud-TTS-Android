@@ -8,6 +8,11 @@ import org.junit.Test
 class ProtocolStateTest {
 
     @Test
+    fun initialSkewIsZero() {
+        assertEquals(0L, ProtocolState().skewSeconds())
+    }
+
+    @Test
     fun updateAbsoluteAppliesWhenWithinCap() {
         val state = ProtocolState()
         assertTrue(state.updateAbsolute(1_000L, 1_600L))
@@ -16,10 +21,44 @@ class ProtocolStateTest {
     }
 
     @Test
+    fun updateAbsoluteAcceptsNegativeSkewWithinCap() {
+        val state = ProtocolState()
+        assertTrue(state.updateAbsolute(1_000_000L - 7_200L, 1_000_000L))
+        assertEquals(-7_200L, state.skewSeconds())
+    }
+
+    @Test
+    fun updateAbsoluteAcceptsExactly24h() {
+        val state = ProtocolState()
+        val local = 1_000_000L
+        val cap = ProtocolState.DEFAULT_MAX_SKEW_SECONDS
+        assertTrue(state.updateAbsolute(local + cap, local))
+        assertEquals(cap, state.skewSeconds())
+    }
+
+    @Test
+    fun updateAbsoluteAcceptsExactlyNegative24h() {
+        val state = ProtocolState()
+        val local = 1_000_000L
+        val cap = ProtocolState.DEFAULT_MAX_SKEW_SECONDS
+        assertTrue(state.updateAbsolute(local - cap, local))
+        assertEquals(-cap, state.skewSeconds())
+    }
+
+    @Test
     fun updateAbsoluteRejectsSkewBeyond24h() {
         val state = ProtocolState()
         val local = 1_700_000_000L
         val server = local + ProtocolState.DEFAULT_MAX_SKEW_SECONDS + 1
+        assertFalse(state.updateAbsolute(server, local))
+        assertEquals(0L, state.skewSeconds())
+    }
+
+    @Test
+    fun updateAbsoluteRejectsSkewJustOverNegative24h() {
+        val state = ProtocolState()
+        val local = 1_700_000_000L
+        val server = local - ProtocolState.DEFAULT_MAX_SKEW_SECONDS - 1
         assertFalse(state.updateAbsolute(server, local))
         assertEquals(0L, state.skewSeconds())
     }
