@@ -286,11 +286,10 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         // Diagnóstico INCONDICIONAL (Hardy): muestra la consulta, la
         // normalización y el resultado, para detectar cualquier fallo de
         // negociación en la próxima captura de logcat.
-        Log.d(
-            TAG,
+        AppLog.d(TAG) {
             "languageAvailability($lang,$country) → $result " +
                 "(iso3=$l3-$c3 · iso2=$l2-$c2 · catálogo=${sets.fullIso3.size})"
-        )
+        }
         return result
     }
 
@@ -308,7 +307,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             c3.uppercase(Locale.ROOT),   // "MEX" — mismo caso que Locale.isO3Country
             cur.getOrElse(2) { "" }
         )
-        Log.d(TAG, "onGetLanguage → ${result.joinToString(",")}")
+        AppLog.d(TAG) { "onGetLanguage → ${result.joinToString(",")}" }
         return result
     }
 
@@ -316,7 +315,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val code = languageAvailability(lang, country)
         // Diagnóstico: permite ver en logcat qué consulta hace la sonda de
         // Ajustes y qué respondemos (para depurar los controles deshabilitados).
-        Log.d(TAG, "onIsLanguageAvailable($lang,$country,$variant) → $code")
+        AppLog.d(TAG) { "onIsLanguageAvailable($lang,$country,$variant) → $code" }
         return code
     }
 
@@ -325,7 +324,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         if (code >= TextToSpeech.LANG_AVAILABLE) {
             currentLanguage = arrayOf(lang, country, variant)
         }
-        Log.d(TAG, "onLoadLanguage($lang,$country,$variant) → $code")
+        AppLog.d(TAG) { "onLoadLanguage($lang,$country,$variant) → $code" }
         return code
     }
 
@@ -388,13 +387,13 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         variant: String
     ): String? {
         if (normLang(lang).isEmpty()) {
-            Log.d(TAG, "onGetDefaultVoiceNameFor($lang,$country,$variant) → null (idioma vacío)")
+            AppLog.d(TAG) { "onGetDefaultVoiceNameFor($lang,$country,$variant) → null (idioma vacío)" }
             return null
         }
         val snap = settings?.snapshot()
             ?: return voiceForLanguage(lang, country)
         val resolved = resolveDefaultVoiceFor(lang, country, snap)
-        Log.d(TAG, "onGetDefaultVoiceNameFor($lang,$country,$variant) → ${resolved ?: "null"} (unificado=${snap.unifiedVoiceMode})")
+        AppLog.d(TAG) { "onGetDefaultVoiceNameFor($lang,$country,$variant) → ${resolved ?: "null"} (unificado=${snap.unifiedVoiceMode})" }
         return resolved
     }
 
@@ -412,10 +411,9 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 )
             )
         } else catalogVoices
-        Log.d(
-            TAG,
+        AppLog.d(TAG) {
             "onGetVoices: exponiendo ${list.size} voces (configurada=$configuredName)"
-        )
+        }
         return list.map { edgeToAndroid(it) }
     }
 
@@ -509,12 +507,11 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     override fun onSynthesizeText(request: SynthesisRequest, callback: SynthesisCallback) {
         // Metadatos de la petición para depurar la integración con el sistema
         // (longitud del texto, NO el contenido; nunca datos sensibles).
-        Log.d(
-            TAG,
+        AppLog.d(TAG) {
             "onSynthesizeText: chars=${request.charSequenceText?.length ?: 0} " +
                 "lang=${request.language}/${request.country}/${request.variant} " +
                 "voice=${request.voiceName} rate=${request.speechRate} pitch=${request.pitch}"
-        )
+        }
         // Una sola llamada terminal (done XOR error) garantizada a este nivel:
         // ni la red ni los errores internos pueden escapar del servicio.
         val guard = TerminalGuard()
@@ -573,7 +570,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
 
         val segments = runCatching {
-            TextSegmenter.segment(text, { stopRequested }, TextSegmenter.OPERATIONAL_SEGMENT_CHARS)
+            TextSegmenter.segment(text, { stopRequested }, TextSegmenter.OPERATIONAL_SEGMENT_BYTES)
         }.getOrElse {
             guard.error(callback, tr(R.string.error_segment_failed))
             return
@@ -681,8 +678,9 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         metrics: SynthesisMetrics
     ): SegmentOutcome {
         val format = EdgeProtocolConstants.OUTPUT_FORMAT_MP3
+        val locale = LocaleCodes.localeOfVoiceName(voice)
         val cacheKey = cache?.key(
-            segment, voice, snap.locale, rate, pitch, format,
+            segment, voice, locale, rate, pitch, format,
             EdgeProtocolConstants.PROTOCOL_VERSION
         )
 
@@ -733,7 +731,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val buffer = ByteArrayOutputStream()
 
         val client = http ?: return SegmentOutcome.Failed(tr(R.string.error_http_client))
-        val prov: TtsProvider = EdgeProtocolClient(
+        val prov = EdgeProtocolClient(
             client,
             drm = SharedProtocol.drm,
             wsBaseUrl = snap.wsUrl,
@@ -744,22 +742,35 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         )
 
         val netStart = android.os.SystemClock.elapsedRealtime()
-        val handle = prov.synthesize(
+        val handle = prov.prepare(
             text = segment,
             voice = voice,
-            locale = snap.locale,
+            locale = LocaleCodes.localeOfVoiceName(voice),
             rate = rate,
             pitch = pitch,
-            onEncodedAudioChunk = { chunk -> synchronized(buffer) { buffer.write(chunk) } },
+            onEncodedAudioChunk = { data, off, len ->
+                synchronized(buffer) { buffer.write(data, off, len) }
+            },
             onComplete = { latch.countDown() },
             onError = { t -> failure = t; latch.countDown() }
         )
-
         active = handle
-        val finished = latch.await(
-            EdgeProtocolConstants.SYNTHESIS_TIMEOUT_MS + 15_000L,
-            TimeUnit.MILLISECONDS
-        )
+        if (stopRequested) {
+            handle.cancel()
+            active = null
+            return SegmentOutcome.Cancelled
+        }
+        handle.start()
+        var finished = false
+        val deadline = android.os.SystemClock.elapsedRealtime() +
+            EdgeProtocolConstants.SYNTHESIS_TIMEOUT_MS + 15_000L
+        while (android.os.SystemClock.elapsedRealtime() < deadline) {
+            if (stopRequested) break
+            if (latch.await(250, TimeUnit.MILLISECONDS)) {
+                finished = true
+                break
+            }
+        }
         active = null
         metrics.networkMs += android.os.SystemClock.elapsedRealtime() - netStart
 

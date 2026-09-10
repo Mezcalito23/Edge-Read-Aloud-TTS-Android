@@ -436,11 +436,10 @@ class SettingsController(private val activity: Activity) {
                 val voiceResult = runCatching { tts.setVoice(testVoice) }
                     .getOrDefault(TextToSpeech.ERROR)
                 val motorVoice = runCatching { tts.voice?.name }.getOrNull() ?: "(ninguna)"
-                Log.d(
-                    "EdgeTtsSettings",
+                AppLog.d("EdgeTtsSettings") {
                     "test: setLanguage($voiceLocale)=$langResult " +
                         "setVoice(${snap.voice})=$voiceResult vozMotor=$motorVoice"
-                )
+                }
                 statusProvider.text = activity.getString(
                     R.string.test_voice_setup,
                     voiceLocale.toLanguageTag(), langResult,
@@ -619,9 +618,12 @@ class SettingsController(private val activity: Activity) {
             .setPositiveButton(R.string.action_save) { _, _ ->
                 val value = input.text.toString().trim()
                 if (value.isNotBlank()) {
-                    store.setUserAgent(value)
-                    statusProvider.text = activity.getString(R.string.user_agent_updated)
-                    refreshAll()
+                    if (store.setUserAgent(value)) {
+                        statusProvider.text = activity.getString(R.string.user_agent_updated)
+                        refreshAll()
+                    } else {
+                        statusProvider.text = activity.getString(R.string.user_agent_invalid)
+                    }
                 }
             }
             .setNeutralButton(R.string.action_restore_user_agent) { _, _ ->
@@ -684,9 +686,12 @@ class SettingsController(private val activity: Activity) {
             .setPositiveButton(R.string.action_save) { _, _ ->
                 val value = input.text.toString().trim()
                 if (value.isNotBlank()) {
-                    store.setOrigin(value)
-                    statusProvider.text = activity.getString(R.string.origin_updated)
-                    refreshAll()
+                    if (store.setOrigin(value)) {
+                        statusProvider.text = activity.getString(R.string.origin_updated)
+                        refreshAll()
+                    } else {
+                        statusProvider.text = activity.getString(R.string.origin_invalid)
+                    }
                 }
             }
             .setNeutralButton(R.string.action_restore_user_agent) { _, _ ->
@@ -906,7 +911,7 @@ class SettingsController(private val activity: Activity) {
 
     /** Muestra host y path; el valor del token queda oculto. */
     private fun mask(url: String): String =
-        url.replace(Regex("(?i)(token=)([^&]+)"), "$1••••")
+        url.replace(TOKEN_QUERY, "$1••••")
             .replace(
                 "speech.platform.bing.com/consumer/speech/synthesize/readaloud",
                 "speech.platform.bing.com/…/readaloud"
@@ -941,5 +946,6 @@ class SettingsController(private val activity: Activity) {
         /** Sliders de velocidad/tono: rango -50..+50 mapeado a progress 0..100. */
         private const val SLIDER_RANGE = 100
         private const val SLIDER_OFFSET = 50
+        private val TOKEN_QUERY = Regex("(?i)(token=)([^&]+)")
     }
 }
