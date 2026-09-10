@@ -144,6 +144,14 @@ class VoiceCatalogRepositoryTest {
         assertEquals(1, server.requestCount)
     }
 
+    @Test
+    fun http500DoesNotRetry() {
+        server.enqueue(MockResponse().setResponseCode(500))
+        val result = repo().refresh()
+        assertFalse(result.fromNetwork)
+        assertEquals(1, server.requestCount)
+    }
+
     private fun rfc2616Now(): String {
         val fmt = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
         fmt.timeZone = TimeZone.getTimeZone("GMT")
