@@ -42,7 +42,7 @@ class ProtocolParsingTest {
 
     private fun newCatalogRepo() = VoiceCatalogRepository(
         client = okhttp3.OkHttpClient(),
-        cacheDir = java.io.File(System.getProperty("java.io.tmpdir"))
+        cacheDir = java.io.File(System.getProperty("java.io.tmpdir") ?: ".")
     )
 
     @Test
@@ -221,7 +221,7 @@ class ProtocolParsingTest {
 
     @Test
     fun cacheKeyChangesWithAnyParameter() {
-        val repo = CacheRepository(java.io.File(System.getProperty("java.io.tmpdir")))
+        val repo = CacheRepository(java.io.File(System.getProperty("java.io.tmpdir") ?: "."))
         val base = repo.key("hola", "es-MX-DaliaNeural", "es-MX", "+0%", "+0Hz", "v1")
         assertEquals(64, base.length)
 

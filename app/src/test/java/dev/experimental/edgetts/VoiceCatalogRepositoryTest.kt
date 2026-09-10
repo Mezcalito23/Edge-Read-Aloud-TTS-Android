@@ -38,7 +38,7 @@ class VoiceCatalogRepositoryTest {
     fun setUp() {
         server = MockWebServer()
         server.start()
-        cacheDir = File(System.getProperty("java.io.tmpdir"), "edge-catalog-${System.nanoTime()}").also {
+        cacheDir = File(System.getProperty("java.io.tmpdir") ?: ".", "edge-catalog-${System.nanoTime()}").also {
             it.mkdirs()
         }
         state = ProtocolState()
