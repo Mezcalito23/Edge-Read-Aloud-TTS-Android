@@ -233,6 +233,20 @@ class ProtocolParsingTest {
     // ── Token anti-abuso Sec-MS-GEC ─────────────────────────────────────────
 
     @Test
+    fun secMsGecMatchesKnownVector() {
+        val token = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
+        val unix = 1_735_689_600L // 2025-01-01 00:00:00 UTC, divisible by 300
+        assertEquals(
+            "B0EDD22C7C09868E2F24C10264A8A3EB877773A7B6040B68AFA4FBCBABEA0238",
+            EdgeDrm.generateSecMsGec(unix, token)
+        )
+        assertEquals(
+            EdgeDrm.generateSecMsGec(unix, token),
+            EdgeProtocolClient.generateSecMsGec(unix, token)
+        )
+    }
+
+    @Test
     fun secMsGecIsDeterministicWithinAWindow() {
         val token = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
         // Dos instantes dentro del MISMO intervalo de 5 minutos → mismo token.

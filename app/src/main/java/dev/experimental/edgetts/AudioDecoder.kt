@@ -43,7 +43,19 @@ interface AudioDecoder {
  */
 class Mp3AudioDecoder : AudioDecoder {
 
+    @Volatile
+    private var cancelled = false
+
+    fun cancel() {
+        cancelled = true
+    }
+
+    fun reset() {
+        cancelled = false
+    }
+
     override fun decode(compressed: ByteArray): AudioDecoder.DecodeResult {
+        if (cancelled) throw SynthesisCancelledException()
         if (compressed.isEmpty()) {
             throw UnsupportedAudioFormatException("MP3 vacío: nada que decodificar")
         }
@@ -106,6 +118,7 @@ class Mp3AudioDecoder : AudioDecoder {
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(MAX_DECODE_MS)
 
         while (true) {
+            if (cancelled) throw SynthesisCancelledException()
             if (System.nanoTime() > deadline) {
                 throw UnsupportedAudioFormatException(
                     "La decodificación MP3 superó ${MAX_DECODE_MS} ms"

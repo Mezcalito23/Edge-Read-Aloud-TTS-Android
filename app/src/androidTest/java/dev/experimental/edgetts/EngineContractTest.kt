@@ -114,7 +114,7 @@ class EngineContractTest {
         // Endpoint local que rechaza la conexión al instante: sin red real.
         val store = SettingsStore(context)
         val wsBefore = store.snapshotBlocking().wsUrl
-        store.setWsUrlForTest("ws://127.0.0.1:9")
+        store.setWsUrl("ws://127.0.0.1:9")
         try {
             withEngine { tts ->
                 val result = speakAndWait(tts, "Hola, prueba de fallo de red.", timeoutSeconds = 90)
@@ -124,33 +124,11 @@ class EngineContractTest {
                 )
             }
         } finally {
-            store.setWsUrlForTest(wsBefore)
+            store.setWsUrl(wsBefore)
         }
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
-
-    private fun SettingsStore.setWsUrlForTest(url: String) {
-        // Acceso directo a la preferencia para la prueba (la UI no expone
-        // editar la URL de WebSocket).
-        javaClass.declaredFields
-            .firstOrNull { it.name == "store" }
-            ?.also { field ->
-                field.isAccessible = true
-                @Suppress("UNCHECKED_CAST")
-                val ds = field.get(this) as androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>
-                kotlinx.coroutines.runBlocking {
-                    ds.updateData { prefs ->
-                        prefs.toMutablePreferences().apply {
-                            set(
-                                androidx.datastore.preferences.core.stringPreferencesKey("ws_url"),
-                                url
-                            )
-                        }
-                    }
-                }
-            }
-    }
 
     private fun withEngine(body: (TextToSpeech) -> Unit) {
         val latch = CountDownLatch(1)

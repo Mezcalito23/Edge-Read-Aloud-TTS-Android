@@ -65,8 +65,17 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             .build()
         http = client
         settings = SettingsStore(app)
-        catalog = VoiceCatalogRepository(client, app.cacheDir)
+        SettingsStore.ensureLoaded(app)
+        catalog = VoiceCatalogRepository(
+            client,
+            app.cacheDir,
+            SharedProtocol.drm
+        ) { settings?.snapshot() }
         cache = CacheRepository(app.cacheDir)
+        Thread({ catalog?.cached() }, "edge-tts-catalog-warm").apply {
+            isDaemon = true
+            start()
+        }
 
         // Idioma inicial: el del dispositivo, si el catálogo lo cubre;
         // si no, español de México. Así el "idioma predeterminado" del motor
@@ -80,6 +89,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     }
 
     override fun onDestroy() {
+        stopRequested = true
+        mp3Decoder.cancel()
         active?.cancel()
         super.onDestroy()
     }
@@ -127,22 +138,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
      * como ISO3 y devuelven siempre ISO3. Devuelve null si el idioma no se
      * puede resolver.
      */
-    private fun toIso3(locale: String): String? {
-        val parts = locale.replace('_', '-').split("-")
-        val lang = parts.getOrNull(0).orEmpty().trim()
-        if (lang.isBlank()) return null
-        // forLanguageTag en vez de los constructores Locale(String[, String]),
-        // deprecados en los SDK recientes.
-        val lang3 = runCatching { Locale.forLanguageTag(lang).isO3Language.lowercase(Locale.ROOT) }
-            .getOrNull() ?: return null
-        val country = parts.getOrNull(1).orEmpty().trim()
-        if (country.isBlank()) return lang3
-        val country3 = if (country.length == 3) country.lowercase(Locale.ROOT)
-        else runCatching {
-            Locale.forLanguageTag("und-${country.uppercase(Locale.ROOT)}").isO3Country.lowercase(Locale.ROOT)
-        }.getOrNull() ?: return lang3
-        return "$lang3-$country3"
-    }
+    private fun toIso3(locale: String): String? = LocaleCodes.toIso3Locale(locale)
 
     // ── Voces expuestas: TODO el catálogo ────────────────────────────────────
     // Se exponen las ~322 voces del catálogo, cada una con SU locale real.
@@ -175,7 +171,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     private fun voiceForLanguage(lang: String, country: String = ""): String? {
         val l3 = normLang(lang)
         if (l3.isEmpty()) return null
-        val configuredName = runCatching { settings?.snapshotBlocking()?.voice }
+        val configuredName = runCatching { settings?.snapshot()?.voice }
             .getOrNull() ?: EdgeProtocolConstants.DEFAULT_VOICE
         val configuredLang3 = normLang(configuredName.substringBefore("-"))
         val catalogVoices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
@@ -237,7 +233,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             return byLang.shortName
         }
 
-        val configured = runCatching { settings?.snapshotBlocking()?.voice }
+        val configured = runCatching { settings?.snapshot()?.voice }
             .getOrNull() ?: EdgeProtocolConstants.DEFAULT_VOICE
         return if (configured in names) configured else EdgeProtocolConstants.DEFAULT_VOICE
     }
@@ -254,70 +250,13 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     * Acepta ISO2 ("es") o ISO3 ("spa"). Los códigos de 3 letras YA son
     * ISO3: no se convierten (hacerlo con forLanguageTag fallaría).
     */
-    private fun normLang(code: String): String {
-        val c = code.trim().lowercase(Locale.ROOT)
-        if (c.isEmpty()) return ""
-        if (c.length == 3) return c                       // ya es ISO3
-        return runCatching {
-            Locale.forLanguageTag(c).isO3Language.lowercase(Locale.ROOT)
-        }.getOrDefault(c)                                  // ISO2 → ISO3
-    }
+    private fun normLang(code: String): String = LocaleCodes.normLang(code)
 
-    /**
-     * Normaliza un código de país a ISO3 minúsculo ("mex", "usa").
-     * Acepta ISO2 ("MX") o ISO3 ("MEX"). IMPORTANTE: los códigos de 3
-     * letras YA son ISO3 y se devuelven tal cual, porque BCP-47 (el formato
-     * de forLanguageTag) NO acepta regiones alfa-3 — pasar "MEX" por
-     * forLanguageTag da país vacío (era el bug que deshabilitaba los
-     * controles de Ajustes).
-     */
-    private fun normCountry(code: String): String {
-        val c = code.trim().lowercase(Locale.ROOT)
-        if (c.isEmpty()) return ""
-        if (c.length == 3) return c                       // ya es ISO3
-        return runCatching {
-            Locale.forLanguageTag("und-${c.uppercase(Locale.ROOT)}")
-                .isO3Country.lowercase(Locale.ROOT)
-        }.getOrDefault(c)                                  // ISO2 → ISO3
-    }
+    private fun normCountry(code: String): String = LocaleCodes.normCountry(code)
 
-    // Cachés ISO3→ISO2. Locale("spa").language devuelve "spa" (NO "es"), así
-    // que la única forma fiable de obtener el ISO2 es buscarlo en las tablas
-    // de Locale. Se cachean porque languageAvailability se llama cientos de
-    // veces al abrir los Ajustes.
-    @Volatile
-    private var iso3To2LangCache: Map<String, String>? = null
+    private fun iso3ToIso2Lang(code3: String): String = LocaleCodes.iso3ToIso2LangOrSelf(code3)
 
-    @Volatile
-    private var iso3To2CountryCache: Map<String, String>? = null
-
-    /** Convierte un código ISO3 de idioma ("spa") a ISO2 ("es"). */
-    private fun iso3ToIso2Lang(code3: String): String {
-        val map = iso3To2LangCache ?: run {
-            val m = HashMap<String, String>()
-            for (iso2 in Locale.getISOLanguages()) {
-                runCatching {
-                    m[Locale.forLanguageTag(iso2).isO3Language.lowercase(Locale.ROOT)] = iso2
-                }
-            }
-            m.also { iso3To2LangCache = it }
-        }
-        return map[code3.lowercase(Locale.ROOT)] ?: code3.lowercase(Locale.ROOT)
-    }
-
-    /** Convierte un código ISO3 de país ("mex") a ISO2 ("mx"). */
-    private fun iso3ToIso2Country(code3: String): String {
-        val map = iso3To2CountryCache ?: run {
-            val m = HashMap<String, String>()
-            for (iso2 in Locale.getISOCountries()) {
-                runCatching {
-                    m[Locale.forLanguageTag("und-$iso2").isO3Country.lowercase(Locale.ROOT)] = iso2.lowercase(Locale.ROOT)
-                }
-            }
-            m.also { iso3To2CountryCache = it }
-        }
-        return map[code3.lowercase(Locale.ROOT)] ?: code3.lowercase(Locale.ROOT)
-    }
+    private fun iso3ToIso2Country(code3: String): String = LocaleCodes.iso3ToIso2CountryOrSelf(code3)
 
     /**
      * Negociación de idioma derivada del catálogo de voces, comparando en ISO3
@@ -459,7 +398,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             Log.d(TAG, "onGetDefaultVoiceNameFor($lang,$country,$variant) → null (idioma vacío)")
             return null
         }
-        val snap = settings?.snapshotBlocking()
+        val snap = settings?.snapshot()
             ?: return voiceForLanguage(lang, country)
         val resolved = resolveDefaultVoiceFor(lang, country, snap)
         Log.d(TAG, "onGetDefaultVoiceNameFor($lang,$country,$variant) → ${resolved ?: "null"} (unificado=${snap.unifiedVoiceMode})")
@@ -467,7 +406,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     }
 
     override fun onGetVoices(): List<Voice> {
-        val configuredName = runCatching { settings?.snapshotBlocking()?.voice }
+        val configuredName = runCatching { settings?.snapshot()?.voice }
             .getOrNull() ?: EdgeProtocolConstants.DEFAULT_VOICE
         val catalogVoices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
         // TODO el catálogo, con los locales reales: el framework busca aquí
@@ -637,6 +576,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         guard: TerminalGuard
     ) {
         stopRequested = false
+        mp3Decoder.reset()
 
         val text = request.charSequenceText?.toString()
 
@@ -653,7 +593,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             return
         }
 
-        val snap = settings?.snapshotBlocking()
+        val snap = settings?.snapshot()
             ?: return guard.error(callback, "No se pudo leer la configuración local.")
 
         val segments = runCatching {
@@ -694,7 +634,11 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             } else true
 
         for (segment in segments) {
-            if (stopRequested || guard.isFired) return
+            if (guard.isFired) return
+            if (stopRequested) {
+                guard.error(callback, TextToSpeech.STOPPED)
+                return
+            }
 
             when (val outcome = synthesizeSegment(segment, snap, voice, rate, pitch)) {
                 is SegmentOutcome.Ok -> {
@@ -702,7 +646,16 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                         guard.error(callback, "No se pudo iniciar el canal de audio.")
                         return
                     }
-                    if (!deliver(outcome.pcm, callback)) return
+                    if (!deliver(outcome.pcm, callback)) {
+                        if (stopRequested) {
+                            guard.error(callback, TextToSpeech.STOPPED)
+                        } else {
+                            guard.error(callback, "No se pudo entregar el audio al sistema.") { msg ->
+                                runCatching { settings?.setLastError(msg) }
+                            }
+                        }
+                        return
+                    }
                 }
 
                 is SegmentOutcome.Failed -> {
@@ -712,7 +665,10 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                     return
                 }
 
-                SegmentOutcome.Cancelled -> return
+                SegmentOutcome.Cancelled -> {
+                    guard.error(callback, TextToSpeech.STOPPED)
+                    return
+                }
             }
         }
 
@@ -781,6 +737,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         // recompilar). El diagnóstico se persiste para depurar desde la app.
         val prov: TtsProvider = EdgeProtocolClient(
             client,
+            drm = SharedProtocol.drm,
             wsBaseUrl = snap.wsUrl,
             userAgent = snap.userAgent,
             origin = snap.origin,
@@ -806,6 +763,11 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         )
         active = null
 
+        if (stopRequested) {
+            handle.cancel()
+            return SegmentOutcome.Cancelled
+        }
+
         if (!finished) {
             handle.cancel()
             return SegmentOutcome.Failed(ErrorMapper.spanish(TimeoutExceptionShim()))
@@ -827,7 +789,10 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         if (decoder != null) {
             // Ruta MP3: decodificar a PCM 16-bit ANTES de tocar el callback.
             val decoded = runCatching { decoder.decode(pcm) }
-                .getOrElse { return SegmentOutcome.Failed(ErrorMapper.spanish(it)) }
+                .getOrElse {
+                    if (it is SynthesisCancelledException) return SegmentOutcome.Cancelled
+                    return SegmentOutcome.Failed(ErrorMapper.spanish(it))
+                }
             pcm = decoded.pcm
             sampleRate = decoded.sampleRateHz
         } else if (AudioFrameParser.detectFormat(pcm) == AudioFrameParser.PayloadFormat.COMPRESSED) {
@@ -873,34 +838,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
     override fun onStop() {
         stopRequested = true
+        mp3Decoder.cancel()
         active?.cancel()
-    }
-
-    /**
-     * Garantiza una única llamada terminal (done XOR error). El resto del
-     * servicio puede llamar done/error con libertad: solo la primera surte
-     * efecto, como exige el contrato de SynthesisCallback.
-     */
-    private class TerminalGuard {
-        private val fired = AtomicBoolean(false)
-
-        val isFired: Boolean
-            get() = fired.get()
-
-        fun done(callback: SynthesisCallback) {
-            if (fired.compareAndSet(false, true)) runCatching { callback.done() }
-        }
-
-        fun error(
-            callback: SynthesisCallback,
-            message: String,
-            persist: ((String) -> Unit)? = null
-        ) {
-            if (fired.compareAndSet(false, true)) {
-                persist?.invoke(message)
-                runCatching { callback.error() }
-            }
-        }
     }
 
     private fun TimeoutExceptionShim(): Throwable =
