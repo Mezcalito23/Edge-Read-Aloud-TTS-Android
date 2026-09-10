@@ -155,14 +155,8 @@ class Mp3AudioDecoder : AudioDecoder {
         }
 
         val outFormat = codec.outputFormat
-        val sampleRate = outFormat.getInteger(
-            MediaFormat.KEY_SAMPLE_RATE,
-            format.getInteger(MediaFormat.KEY_SAMPLE_RATE, 24000)
-        )
-        val channels = outFormat.getInteger(
-            MediaFormat.KEY_CHANNEL_COUNT,
-            format.getInteger(MediaFormat.KEY_CHANNEL_COUNT, 1)
-        )
+        val sampleRate = formatInt(outFormat, MediaFormat.KEY_SAMPLE_RATE, formatInt(format, MediaFormat.KEY_SAMPLE_RATE, 24000))
+        val channels = formatInt(outFormat, MediaFormat.KEY_CHANNEL_COUNT, formatInt(format, MediaFormat.KEY_CHANNEL_COUNT, 1))
         val mono = if (channels >= 2) downmixToMono(result, channels) else result
         return AudioDecoder.DecodeResult(mono, sampleRate, 1)
     }
@@ -191,6 +185,11 @@ class Mp3AudioDecoder : AudioDecoder {
             if (mime.startsWith("audio/", ignoreCase = true)) return i
         }
         return null
+    }
+
+    private fun formatInt(format: MediaFormat, key: String, fallback: Int): Int {
+        if (!format.containsKey(key)) return fallback
+        return format.getInteger(key)
     }
 
     private fun downmixToMono(pcm: ByteArray, channels: Int): ByteArray {
