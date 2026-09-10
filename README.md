@@ -1,4 +1,4 @@
-# Edge Read Aloud TTS — experimental Android TTS engine (v0.6.0)
+# Edge Read Aloud TTS — experimental Android TTS engine (v0.9.0)
 
 An Android application that registers as a **system text-to-speech engine**
 (`TextToSpeechService`) and synthesizes natural speech through the
@@ -62,7 +62,7 @@ threads.
    ./gradlew test
    ```
 
-3. **Build the APK:**
+3. **Build the debug APK:**
 
    ```bash
    ./gradlew assembleDebug
@@ -70,7 +70,17 @@ threads.
 
    The APK lands in `app/build/outputs/apk/debug/app-debug.apk`.
 
-4. **Instrumented tests** (require a device/emulator with API 26+, no real network):
+4. **Release (R8 minify + resource shrink):**
+
+   ```bash
+   ./gradlew assembleRelease
+   ```
+
+   ProGuard keeps the TTS service and engine contract activities. After
+   installing a release APK, verify that Settings still lists the engine,
+   the catalog loads, and synthesis works.
+
+5. **Instrumented tests** (require a device/emulator with API 26+, no real network):
 
    ```bash
    ./gradlew connectedDebugAndroidTest
@@ -122,10 +132,12 @@ EdgeReadAloudTtsService : TextToSpeechService
   ├── TtsProvider ← EdgeProtocolClient  (experimental WebSocket)
   ├── SsmlBuilder                  (XML escaping + speak/voice/prosody)
   ├── AudioFrameParser             (text/binary frames, length prefix)
-  ├── TextSegmenter                (≤ 4,000 chars, no word splitting)
-  ├── CacheRepository              (SHA-256, 100 MB max, LRU)
-  └── Mp3AudioDecoder              (MediaExtractor + MediaCodec → PCM)
+  ├── TextSegmenter                (1200-char operational / 4000 protocol cap)
+  ├── CacheRepository              (MP3, atomic tmp+rename, SHA-256, 100 MB LRU)
+  └── Mp3AudioDecoder              (MediaExtractor + MediaCodec → PCM; fail-fast)
 ```
+
+Shared process objects: `SharedProtocol` (DRM + one OkHttpClient).
 
 **Replacement point:** `EdgeReadAloudTtsService` only talks to the
 `TtsProvider` interface. To migrate to Azure Cognitive Services or another
@@ -170,8 +182,8 @@ The endpoint produces `audio-24khz-48kbitrate-mono-mp3` (48 kbps CBR MP3).
 canonical **MediaExtractor + MediaCodec** pipeline (the extractor hands the
 codec a complete MediaFormat; configuring the codec by hand with raw MP3
 throws `IllegalStateException` on many devices) and delivers 16-bit 24 kHz
-mono PCM to the callback. Opus is deferred to phase 2 behind the same
-`AudioDecoder` interface.
+mono PCM to the callback. Empty, oversized, deadline and stagnant-EOS inputs
+fail fast. The optional cache stores **MP3**, not PCM.
 
 ### Voice model (like Google TTS)
 
@@ -234,7 +246,7 @@ voice's 2-letter language code.
 | 401 | Invalid context/authentication |
 | timeout | Slow network or server unavailable |
 | EOF | Connection closed before the audio completed |
-| invalid audio | Undecodable format (MP3 via MediaCodec; Opus, phase 2) |
+| invalid audio | Undecodable format (MP3 via MediaCodec) |
 
 ## Security
 
@@ -246,14 +258,15 @@ voice's 2-letter language code.
   and can be cleared from the app.
 - Token-free Logcat: URLs with sensitive parameters are never printed.
 
-## Known limitations (v0.6)
+## Known limitations (v0.9)
 
 - The protocol remains unofficial: if Microsoft rotates the accepted
   version, the handshake will return 403 again. No-recompile adjustments:
   User-Agent and Origin from the app; as a last resort,
   `EdgeProtocolConstants.CLIENT_VERSION`.
-- The decoder is MP3; Opus is deferred to phase 2 behind the `AudioDecoder`
-  interface.
+- The decoder is MP3 (`AudioDecoder` is the extension point for other codecs).
+- Persistent WebSocket, prefetch and incremental MP3 streaming are out of
+  scope until measured (v3.1 §11 / §16).
 - The width of the system Settings language box is drawn by Android (not the
   engine); on narrow screens it may appear clipped.
 - The system Settings "Speech rate", "Pitch" and "Play example" controls may
