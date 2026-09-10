@@ -575,9 +575,11 @@ class SettingsController(private val activity: Activity) {
         // El diagnóstico del handshake va en su propio recuadro monoespaciado
         // (igual que la tarjeta de endpoints) para que sea legible por igual
         // en el smartphone y en la tablet, y no se mezcle con el error.
-        if (snap.handshakeDebug.isNotBlank()) {
+        if (snap.handshakeDebug.isNotBlank() || snap.lastMetrics.isNotBlank()) {
             textHandshakeDebug.visibility = View.VISIBLE
-            textHandshakeDebug.text = snap.handshakeDebug
+            textHandshakeDebug.text = listOf(snap.lastMetrics, snap.handshakeDebug)
+                .filter { it.isNotBlank() }
+                .joinToString("\n")
         } else {
             textHandshakeDebug.visibility = View.GONE
         }

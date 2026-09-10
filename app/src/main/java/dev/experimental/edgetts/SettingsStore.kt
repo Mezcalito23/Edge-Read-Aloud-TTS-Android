@@ -44,7 +44,8 @@ class SettingsStore(context: Context) {
         val lastSpanishVoice: String,
         val lastError: String,
         val handshakeDebug: String,
-        val catalogUpdatedAt: Long
+        val catalogUpdatedAt: Long,
+        val lastMetrics: String
     ) {
         companion object {
             fun defaults(): Snapshot = Snapshot(
@@ -62,7 +63,8 @@ class SettingsStore(context: Context) {
                 lastSpanishVoice = EdgeProtocolConstants.DEFAULT_VOICE,
                 lastError = "",
                 handshakeDebug = "",
-                catalogUpdatedAt = 0L
+                catalogUpdatedAt = 0L,
+                lastMetrics = ""
             )
         }
     }
@@ -125,6 +127,11 @@ class SettingsStore(context: Context) {
         applyAndPersist({ it.copy(handshakeDebug = value) }) { it[K_HS_DEBUG] = value }
     }
 
+    fun setLastMetrics(line: String) {
+        val value = line.take(500)
+        applyAndPersist({ it.copy(lastMetrics = value) }) { it[K_LAST_METRICS] = value }
+    }
+
     fun setLastError(message: String) {
         val value = message.take(500)
         applyAndPersist({ it.copy(lastError = value) }) { it[K_LAST_ERROR] = value }
@@ -177,6 +184,7 @@ class SettingsStore(context: Context) {
         val K_LAST_ERROR = stringPreferencesKey("last_error")
         val K_HS_DEBUG = stringPreferencesKey("handshake_debug")
         val K_CATALOG_TS = longPreferencesKey("catalog_updated_at")
+        val K_LAST_METRICS = stringPreferencesKey("last_metrics")
 
         fun ensureLoaded(context: Context) {
             Holder.get(context)
@@ -198,7 +206,8 @@ class SettingsStore(context: Context) {
             lastSpanishVoice = prefs[K_LAST_ES_VOICE] ?: EdgeProtocolConstants.DEFAULT_VOICE,
             lastError = prefs[K_LAST_ERROR].orEmpty(),
             handshakeDebug = prefs[K_HS_DEBUG].orEmpty(),
-            catalogUpdatedAt = prefs[K_CATALOG_TS] ?: 0L
+            catalogUpdatedAt = prefs[K_CATALOG_TS] ?: 0L,
+            lastMetrics = prefs[K_LAST_METRICS].orEmpty()
         )
     }
 

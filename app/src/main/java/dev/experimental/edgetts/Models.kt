@@ -15,7 +15,7 @@ interface TtsProvider {
      * Inicia la síntesis de [text]. Garantiza exactamente UNA llamada
      * terminal: [onComplete] XOR [onError].
      *
-     * @param onPcmChunk trozos de audio del formato pedido (PCM crudo o MP3).
+     * @param onEncodedAudioChunk trozos MP3 del WebSocket (aún no PCM).
      */
     fun synthesize(
         text: String,
@@ -23,7 +23,7 @@ interface TtsProvider {
         locale: String,
         rate: String,
         pitch: String,
-        onPcmChunk: (ByteArray) -> Unit,
+        onEncodedAudioChunk: (ByteArray) -> Unit,
         onComplete: () -> Unit,
         onError: (Throwable) -> Unit
     ): Cancellable
@@ -68,6 +68,20 @@ class SynthesisCancelledException : Exception("Síntesis cancelada")
 class NoAudioReceivedException :
     Exception("El servidor completó la sesión sin enviar audio")
 
+/** Contadores de una petición de síntesis. Sin texto, URLs ni tokens. */
+class SynthesisMetrics {
+    var segments: Int = 0
+    var cacheHits: Int = 0
+    var cacheMisses: Int = 0
+    var decodeMs: Long = 0
+    var networkMs: Long = 0
+    var mp3Bytes: Int = 0
+
+    fun line(): String =
+        "métricas segs=$segments hit=$cacheHits miss=$cacheMisses" +
+            " decode=${decodeMs}ms red=${networkMs}ms mp3=${mp3Bytes}B"
+}
+
 // ── Mapeo a mensajes legibles ───────────────────────────────────────────
 
 /**
@@ -81,8 +95,7 @@ object ErrorMapper {
             "Síntesis cancelada por el usuario o por una solicitud nueva."
 
         t is UnsupportedAudioFormatException ->
-            "Audio no decodificable: ${t.message?.take(160) ?: "formato no reconocido"}. " +
-                "MP3 se decodifica con MediaCodec; Opus queda para la fase 2."
+            "Audio no decodificable: ${t.message?.take(160) ?: "formato no reconocido"}."
 
         t is NoAudioReceivedException ->
             "El servidor no envió audio: pudo rechazar el formato o el SSML solicitados."
