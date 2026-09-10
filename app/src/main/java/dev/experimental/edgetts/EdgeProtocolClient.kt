@@ -43,11 +43,11 @@ class EdgeProtocolClient(
         locale: String,
         rate: String,
         pitch: String,
-        onPcmChunk: (ByteArray) -> Unit,
+        onEncodedAudioChunk: (ByteArray) -> Unit,
         onComplete: () -> Unit,
         onError: (Throwable) -> Unit
     ): Cancellable {
-        val session = Session(text, voice, locale, rate, pitch, onPcmChunk, onComplete, onError)
+        val session = Session(text, voice, locale, rate, pitch, onEncodedAudioChunk, onComplete, onError)
         session.connect()
         return Cancellable { session.cancel() }
     }
@@ -58,7 +58,7 @@ class EdgeProtocolClient(
         private val locale: String,
         private val rate: String,
         private val pitch: String,
-        private val onPcmChunk: (ByteArray) -> Unit,
+        private val onEncodedAudioChunk: (ByteArray) -> Unit,
         private val onComplete: () -> Unit,
         private val onError: (Throwable) -> Unit
     ) {
@@ -213,7 +213,7 @@ class EdgeProtocolClient(
                     val payload = frame.payload
                     if (payload.isNotEmpty() && !cancelled.get()) {
                         receivedAudio.set(true)
-                        onPcmChunk(payload)
+                        onEncodedAudioChunk(payload)
                     }
                 }
             }

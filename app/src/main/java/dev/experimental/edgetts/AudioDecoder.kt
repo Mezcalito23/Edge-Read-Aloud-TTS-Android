@@ -1,18 +1,17 @@
 package dev.experimental.edgetts
 
 import android.media.MediaCodec
+import android.media.MediaDataSource
 import android.media.MediaExtractor
 import android.media.MediaFormat
-import android.media.MediaDataSource
 import android.os.Build
+import android.os.SystemClock
 import java.io.ByteArrayOutputStream
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
- * Punto de extensión previsto por la especificación: el audio comprimido
- * NUNCA se entrega directamente a SynthesisCallback; se decodifica a PCM
- * 16-bit antes. Esta interfaz permite añadir decodificadores (Opus, fase 2)
- * sin tocar el servicio ni el cliente.
+ * Punto de extensión: el audio comprimido NUNCA se entrega a
+ * SynthesisCallback; se decodifica a PCM 16-bit antes.
  */
 interface AudioDecoder {
 
@@ -22,24 +21,13 @@ interface AudioDecoder {
         val channelCount: Int
     )
 
-    /**
-     * Decodifica un flujo comprimido COMPLETO a PCM 16-bit.
-     * @throws UnsupportedAudioFormatException si el dispositivo no puede
-     * decodificar el formato o los datos están corruptos.
-     */
     fun decode(compressed: ByteArray): DecodeResult
 }
 
 /**
- * Decodificador MP3 → PCM 16-bit con la tubería canónica de Android:
- * **MediaExtractor + MediaCodec**. El extractor parsea el contenedor MP3
- * desde memoria (sin tocar disco) y entrega al códec un MediaFormat COMPLETO
- * (mime + sample-rate + channel-count), que es lo que los decodificadores de
- * fabricante esperan: configurar el códec a mano con el MP3 crudo lanza
- * IllegalStateException en muchos equipos.
- *
- * Válida para audio-24khz-48kbitrate-mono-mp3 y cualquier MP3 que acepte el
- * códec del dispositivo.
+ * MP3 → PCM 16-bit con MediaExtractor + MediaCodec. Fail-fast: vacío,
+ * sobre-tamaño, deadline, EOS sin progreso, audio ausente. Recursos en
+ * finally. Cancelable desde onStop().
  */
 class Mp3AudioDecoder : AudioDecoder {
 
@@ -54,126 +42,116 @@ class Mp3AudioDecoder : AudioDecoder {
         cancelled = false
     }
 
-    override fun decode(compressed: ByteArray): AudioDecoder.DecodeResult {
+    override fun decode(compressed: ByteArray): AudioDecoder.DecodeResult =
+        decode(compressed, MAX_INPUT_BYTES, MAX_DECODE_MS)
+
+    fun decode(
+        mp3: ByteArray,
+        maxInputBytes: Int,
+        deadlineMs: Long
+    ): AudioDecoder.DecodeResult {
         if (cancelled) throw SynthesisCancelledException()
-        if (compressed.isEmpty()) {
-            throw UnsupportedAudioFormatException("MP3 vacío: nada que decodificar")
+        if (mp3.isEmpty()) throw UnsupportedAudioFormatException("MP3 vacío")
+        if (mp3.size > maxInputBytes) {
+            throw UnsupportedAudioFormatException("MP3 excede límite (${mp3.size} > $maxInputBytes)")
         }
 
-        val extractor = MediaExtractor()
-        return try {
-            extractor.setDataSource(InMemorySource(compressed))
-            if (extractor.trackCount == 0) {
-                throw UnsupportedAudioFormatException(
-                    "MediaExtractor no encontró pistas: los datos no son MP3"
-                )
-            }
-            extractor.selectTrack(0)
-            val format = extractor.getTrackFormat(0)
+        val deadline = SystemClock.elapsedRealtime() + deadlineMs
+        var extractor: MediaExtractor? = null
+        var codec: MediaCodec? = null
+        try {
+            extractor = MediaExtractor()
+            extractor.setDataSource(InMemorySource(mp3))
+            val track = selectAudioTrack(extractor)
+                ?: throw UnsupportedAudioFormatException("No hay track de audio")
+            extractor.selectTrack(track)
+            val format = extractor.getTrackFormat(track)
             val mime = format.getString(MediaFormat.KEY_MIME)
-                ?: throw UnsupportedAudioFormatException("La pista no declara MIME")
+                ?: throw UnsupportedAudioFormatException("MIME ausente")
             if (!mime.startsWith("audio/", ignoreCase = true)) {
                 throw UnsupportedAudioFormatException("MIME inesperado: $mime")
             }
 
-            val codec = runCatching { MediaCodec.createDecoderByType(mime) }
-                .getOrElse {
-                    throw UnsupportedAudioFormatException(
-                        "Este dispositivo no tiene decodificador para $mime"
-                    )
-                }
-
-            try {
-                codec.configure(format, null, null, 0)
-                codec.start()
-                runDecode(codec, extractor, format)
-            } catch (e: UnsupportedAudioFormatException) {
-                throw e
-            } catch (t: Throwable) {
+            codec = runCatching { MediaCodec.createDecoderByType(mime) }.getOrElse {
                 throw UnsupportedAudioFormatException(
-                    "MP3 no decodificable: ${detail(t)}", t
+                    "Este dispositivo no tiene decodificador para $mime", it
                 )
-            } finally {
-                runCatching { codec.stop() }
-                runCatching { codec.release() }
             }
+            codec.configure(format, null, null, 0)
+            codec.start()
+            return runDecode(codec, extractor, format, deadline)
+        } catch (e: SynthesisCancelledException) {
+            throw e
+        } catch (e: TimeoutException) {
+            throw e
         } catch (e: UnsupportedAudioFormatException) {
             throw e
         } catch (t: Throwable) {
             throw UnsupportedAudioFormatException("MP3 no decodificable: ${detail(t)}", t)
         } finally {
-            runCatching { extractor.release() }
+            runCatching { codec?.stop() }
+            runCatching { codec?.release() }
+            runCatching { extractor?.release() }
         }
     }
 
     private fun runDecode(
         codec: MediaCodec,
         extractor: MediaExtractor,
-        format: MediaFormat
+        format: MediaFormat,
+        deadline: Long
     ): AudioDecoder.DecodeResult {
         val pcm = ByteArrayOutputStream(64 * 1024)
         val info = MediaCodec.BufferInfo()
-        var sawInputEos = false
+        var inputEos = false
+        var outputEos = false
+        var stagnantAfterEos = 0
         var decodedFrames = 0
-        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(MAX_DECODE_MS)
 
-        while (true) {
+        while (!outputEos) {
             if (cancelled) throw SynthesisCancelledException()
-            if (System.nanoTime() > deadline) {
-                throw UnsupportedAudioFormatException(
-                    "La decodificación MP3 superó ${MAX_DECODE_MS} ms"
-                )
+            if (SystemClock.elapsedRealtime() > deadline) {
+                throw TimeoutException("Deadline decoder")
             }
 
-            // ── Alimentar entrada desde el extractor ─────────────────────
-            if (!sawInputEos) {
-                val inIdx = codec.dequeueInputBuffer(POLL_TIMEOUT_US)
-                if (inIdx >= 0) {
-                    val buf = codec.getInputBuffer(inIdx)
-                    if (buf == null) {
-                        codec.queueInputBuffer(
-                            inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM
-                        )
-                        sawInputEos = true
-                    } else {
-                        val n = extractor.readSampleData(buf, 0)
-                        if (n < 0) {
-                            codec.queueInputBuffer(
-                                inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM
-                            )
-                            sawInputEos = true
-                        } else {
-                            codec.queueInputBuffer(inIdx, 0, n, extractor.sampleTime, 0)
-                            extractor.advance()
+            if (!inputEos) inputEos = queueInput(codec, extractor)
+
+            val outIdx = codec.dequeueOutputBuffer(info, POLL_TIMEOUT_US)
+            when {
+                outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                    stagnantAfterEos = 0
+                }
+                outIdx >= 0 -> {
+                    if (info.size > 0) {
+                        val buf = codec.getOutputBuffer(outIdx)
+                        if (buf != null) {
+                            val chunk = ByteArray(info.size)
+                            buf.get(chunk)
+                            pcm.write(chunk)
+                            decodedFrames++
                         }
                     }
-                }
-            }
-
-            // ── Drenar salida ────────────────────────────────────────────
-            var outIdx = codec.dequeueOutputBuffer(info, POLL_TIMEOUT_US)
-            if (outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                outIdx = codec.dequeueOutputBuffer(info, 0)
-            }
-            if (outIdx >= 0) {
-                if (info.size > 0) {
-                    val buf = codec.getOutputBuffer(outIdx)
-                    if (buf != null) {
-                        val chunk = ByteArray(info.size)
-                        buf.get(chunk)
-                        pcm.write(chunk)
-                        decodedFrames++
+                    codec.releaseOutputBuffer(outIdx, false)
+                    stagnantAfterEos = 0
+                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+                        outputEos = true
                     }
                 }
-                codec.releaseOutputBuffer(outIdx, false)
-                if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
+                else -> {
+                    if (inputEos && ++stagnantAfterEos > STAGNANT_AFTER_EOS) {
+                        throw UnsupportedAudioFormatException(
+                            "Decoder sin progreso después de EOS"
+                        )
+                    }
+                }
             }
+        }
 
-            if (sawInputEos && decodedFrames == 0 && outIdx < 0 &&
-                System.nanoTime() > deadline - TimeUnit.SECONDS.toNanos(2)
-            ) {
-                break
-            }
+        val result = pcm.toByteArray()
+        if (result.isEmpty() || result.size % 2 != 0) {
+            throw UnsupportedAudioFormatException(
+                "Audio ausente (frames=$decodedFrames, bytes=${result.size})"
+            )
         }
 
         val outFormat = codec.outputFormat
@@ -185,22 +163,36 @@ class Mp3AudioDecoder : AudioDecoder {
             MediaFormat.KEY_CHANNEL_COUNT,
             format.getInteger(MediaFormat.KEY_CHANNEL_COUNT, 1)
         )
-
-        val result = pcm.toByteArray()
-        if (result.isEmpty() || result.size % 2 != 0) {
-            throw UnsupportedAudioFormatException(
-                "El decodificador no produjo PCM 16-bit válido " +
-                    "(frames=$decodedFrames, bytes=${result.size})"
-            )
-        }
-
-        // Si algún dispositivo entregara más de un canal, se mezcla a mono:
-        // SynthesisCallback se configura en mono (1 canal).
         val mono = if (channels >= 2) downmixToMono(result, channels) else result
         return AudioDecoder.DecodeResult(mono, sampleRate, 1)
     }
 
-    /** Mezcla pares de muestras 16-bit LE a mono (media de canales). */
+    private fun queueInput(codec: MediaCodec, extractor: MediaExtractor): Boolean {
+        val inIdx = codec.dequeueInputBuffer(POLL_TIMEOUT_US)
+        if (inIdx < 0) return false
+        val buf = codec.getInputBuffer(inIdx)
+        if (buf == null) {
+            codec.queueInputBuffer(inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+            return true
+        }
+        val n = extractor.readSampleData(buf, 0)
+        if (n < 0) {
+            codec.queueInputBuffer(inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+            return true
+        }
+        codec.queueInputBuffer(inIdx, 0, n, extractor.sampleTime, 0)
+        extractor.advance()
+        return false
+    }
+
+    private fun selectAudioTrack(extractor: MediaExtractor): Int? {
+        for (i in 0 until extractor.trackCount) {
+            val mime = extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME) ?: continue
+            if (mime.startsWith("audio/", ignoreCase = true)) return i
+        }
+        return null
+    }
+
     private fun downmixToMono(pcm: ByteArray, channels: Int): ByteArray {
         val frameBytes = channels * 2
         val frames = pcm.size / frameBytes
@@ -218,19 +210,16 @@ class Mp3AudioDecoder : AudioDecoder {
         return mono
     }
 
-    /** Detalle completo de la excepción para el diagnóstico en la app. */
     private fun detail(t: Throwable): String = buildString {
         append(t.javaClass.simpleName)
         t.message?.let { append(": ").append(it.take(120)) }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && t is android.media.MediaCodec.CodecException) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && t is MediaCodec.CodecException) {
             append(" · errorCode=").append(t.errorCode)
             t.diagnosticInfo?.let { append(" · diag=").append(it.take(80)) }
         }
     }
 
-    /** MediaDataSource en memoria: el extractor lee del array, sin archivo. */
     private class InMemorySource(private val data: ByteArray) : MediaDataSource() {
-        private var pos = 0L
         override fun readAt(position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
             if (position >= data.size) return -1
             val n = minOf(size.toLong(), data.size - position).toInt()
@@ -244,6 +233,8 @@ class Mp3AudioDecoder : AudioDecoder {
 
     companion object {
         private const val POLL_TIMEOUT_US = 10_000L
-        private const val MAX_DECODE_MS = 45_000L
+        const val MAX_DECODE_MS: Long = 45_000L
+        const val MAX_INPUT_BYTES: Int = 2 * 1024 * 1024
+        const val STAGNANT_AFTER_EOS: Int = 25
     }
 }

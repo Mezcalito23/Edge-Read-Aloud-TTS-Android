@@ -222,12 +222,36 @@ class ProtocolParsingTest {
     @Test
     fun cacheKeyChangesWithAnyParameter() {
         val repo = CacheRepository(java.io.File(System.getProperty("java.io.tmpdir") ?: "."))
-        val base = repo.key("hola", "es-MX-DaliaNeural", "es-MX", "+0%", "+0Hz", "v1")
+        val base = repo.key(
+            "hola", "es-MX-DaliaNeural", "es-MX", "+0%", "+0Hz",
+            EdgeProtocolConstants.OUTPUT_FORMAT_MP3, "v1"
+        )
         assertEquals(64, base.length)
 
-        assertTrue(base != repo.key("hola.", "es-MX-DaliaNeural", "es-MX", "+0%", "+0Hz", "v1"))
-        assertTrue(base != repo.key("hola", "es-MX-DaliaNeural", "es-MX", "+10%", "+0Hz", "v1"))
-        assertTrue(base != repo.key("hola", "es-MX-DaliaNeural", "es-MX", "+0%", "+0Hz", "v2"))
+        assertTrue(
+            base != repo.key(
+                "hola.", "es-MX-DaliaNeural", "es-MX", "+0%", "+0Hz",
+                EdgeProtocolConstants.OUTPUT_FORMAT_MP3, "v1"
+            )
+        )
+        assertTrue(
+            base != repo.key(
+                "hola", "es-MX-DaliaNeural", "es-MX", "+10%", "+0Hz",
+                EdgeProtocolConstants.OUTPUT_FORMAT_MP3, "v1"
+            )
+        )
+        assertTrue(
+            base != repo.key(
+                "hola", "es-MX-DaliaNeural", "es-MX", "+0%", "+0Hz",
+                EdgeProtocolConstants.OUTPUT_FORMAT_MP3, "v2"
+            )
+        )
+        assertTrue(
+            base != repo.key(
+                "hola", "es-MX-DaliaNeural", "es-MX", "+0%", "+0Hz",
+                "other-format", "v1"
+            )
+        )
     }
 
     // ── Token anti-abuso Sec-MS-GEC ─────────────────────────────────────────
