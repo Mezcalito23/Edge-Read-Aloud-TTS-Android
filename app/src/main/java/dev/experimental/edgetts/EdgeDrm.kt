@@ -57,8 +57,8 @@ class EdgeDrm(private val state: ProtocolState) {
     fun cookieHeader(muid: String): String = "muid=$muid;"
 
     fun handshakeHeaders(userAgent: String, origin: String, muid: String): Map<String, String> {
-        val ua = userAgent.trim().ifBlank { EdgeProtocolConstants.DEFAULT_USER_AGENT }
-        val orig = origin.trim().ifBlank { EdgeProtocolConstants.DEFAULT_ORIGIN }
+        val ua = HeaderPolicy.orDefaultUserAgent(userAgent)
+        val orig = HeaderPolicy.orDefaultOrigin(origin)
         return linkedMapOf(
             "User-Agent" to ua,
             "Origin" to orig,
@@ -71,11 +71,7 @@ class EdgeDrm(private val state: ProtocolState) {
     }
 
     fun jsTimestamp(withTrailingZ: Boolean = false): String {
-        val fmt = SimpleDateFormat(
-            "EEE MMM dd yyyy HH:mm:ss 'GMT+0000 (Coordinated Universal Time)'",
-            Locale.US
-        ).apply { timeZone = TimeZone.getTimeZone("UTC") }
-        val stamp = fmt.format(Date())
+        val stamp = checkNotNull(JS_STAMP.get()).format(Date())
         return if (withTrailingZ) stamp + "Z" else stamp
     }
 
@@ -101,10 +97,8 @@ class EdgeDrm(private val state: ProtocolState) {
         attempt: Int
     ): String {
         val nowSeconds = unixSeconds()
-        val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }
-        val windowUtc = fmt.format(Date((nowSeconds - nowSeconds % 300) * 1000))
+        val windowUtc = checkNotNull(WINDOW_STAMP.get())
+            .format(Date((nowSeconds - nowSeconds % 300) * 1000))
         return "GEC=${gec.take(8)}… · ventana=$windowUtc UTC · versión=$version" +
             " · MUID=${muid.take(8)}… · Origin=${origin.take(24)}…" +
             " · UA=…${userAgent.substringAfterLast(' ')}" +
@@ -114,6 +108,23 @@ class EdgeDrm(private val state: ProtocolState) {
     companion object {
         private const val WIN_EPOCH_SECONDS: Long = 11_644_473_600L
         private const val TICKS_PER_SECOND: Long = 10_000_000L
+
+        private val JS_STAMP = ThreadLocal.withInitial {
+            SimpleDateFormat(
+                "EEE MMM dd yyyy HH:mm:ss 'GMT+0000 (Coordinated Universal Time)'",
+                Locale.US
+            ).apply { timeZone = TimeZone.getTimeZone("UTC") }
+        }
+        private val WINDOW_STAMP = ThreadLocal.withInitial {
+            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
+        }
+        private val RFC2616 = ThreadLocal.withInitial {
+            SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("GMT")
+            }
+        }
 
         /**
          * SHA-256 uppercase de "{ticks}{TrustedClientToken}".
@@ -128,13 +139,11 @@ class EdgeDrm(private val state: ProtocolState) {
             val raw = "$ticks$trustedClientToken"
             val digest = MessageDigest.getInstance("SHA-256")
                 .digest(raw.toByteArray(Charsets.US_ASCII))
-            return digest.joinToString("") { "%02x".format(it) }.uppercase(Locale.US)
+            return Hex.encode(digest, upper = true)
         }
 
         fun parseRfc2616Date(date: String): Long? = runCatching {
-            val fmt = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
-            fmt.timeZone = TimeZone.getTimeZone("GMT")
-            fmt.parse(date.trim())?.time?.div(1000)
+            checkNotNull(RFC2616.get()).parse(date.trim())?.time?.div(1000)
         }.getOrNull()
 
         fun redactUrl(url: String): String {

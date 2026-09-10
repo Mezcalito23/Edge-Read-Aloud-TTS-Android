@@ -98,6 +98,20 @@ class AudioFrameParserTest {
     }
 
     @Test
+    fun unexpectedContentTypeIsDiagnosticOnly() {
+        val headerText = "Path: audio\r\nContent-Type: audio/ogg\r\n\r\n"
+        val headerBytes = headerText.toByteArray(Charsets.US_ASCII)
+        val payload = byteArrayOf(0x01, 0x02)
+        val frameBytes = byteArrayOf(
+            ((headerBytes.size shr 8) and 0xFF).toByte(),
+            (headerBytes.size and 0xFF).toByte()
+        ) + headerBytes + payload
+        val result = AudioFrameParser.parseBinaryFrame(frameBytes)
+        assertTrue(result.unexpectedAudioType())
+        assertEquals(2, result.payload.size)
+    }
+
+    @Test
     fun detectFormatPcm() {
         val pcm = byteArrayOf(0x00.toByte(), 0x7F.toByte(), 0x80.toByte(), 0xFF.toByte())
         assertEquals(AudioFrameParser.PayloadFormat.PCM, AudioFrameParser.detectFormat(pcm))

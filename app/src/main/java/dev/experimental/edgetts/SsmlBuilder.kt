@@ -45,7 +45,7 @@ object SsmlBuilder {
      */
     fun voiceLongName(shortName: String): String {
         if (shortName.startsWith("Microsoft Server Speech Text to Speech Voice")) return shortName
-        val match = Regex("^([a-z]{2,})-([A-Z]{2,})-(.+Neural)$").find(shortName) ?: return shortName
+        val match = VOICE_LONG.find(shortName) ?: return shortName
         val lang = match.groupValues[1]
         var region = match.groupValues[2]
         var name = match.groupValues[3]
@@ -84,4 +84,6 @@ object SsmlBuilder {
         }
         append("</voice></speak>")
     }
+
+    private val VOICE_LONG = Regex("^([a-z]{2,})-([A-Z]{2,})-(.+Neural)$")
 }

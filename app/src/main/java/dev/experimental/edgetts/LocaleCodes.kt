@@ -80,4 +80,15 @@ object LocaleCodes {
         val country3 = normCountry(country)
         return if (country3.isEmpty()) lang3 else "$lang3-$country3"
     }
+
+    /**
+     * Locale BCP-47 de un shortName Neural ("es-MX-DaliaNeural" → "es-MX").
+     */
+    fun localeOfVoiceName(shortName: String): String {
+        val parts = shortName.trim().split("-")
+        if (parts.size >= 2 && parts[0].isNotEmpty() && parts[1].isNotEmpty()) {
+            return "${parts[0]}-${parts[1]}"
+        }
+        return EdgeProtocolConstants.DEFAULT_LOCALE
+    }
 }

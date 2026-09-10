@@ -21,4 +21,14 @@ class LocaleCodesTest {
         assertEquals("eng-usa", LocaleCodes.toIso3Locale("en-US"))
         assertEquals("spa-mex", LocaleCodes.toIso3Locale("spa-MEX"))
     }
+
+    @Test
+    fun localeOfVoiceNameUsesFirstTwoTags() {
+        assertEquals("es-MX", LocaleCodes.localeOfVoiceName("es-MX-DaliaNeural"))
+        assertEquals("zh-CN", LocaleCodes.localeOfVoiceName("zh-CN-YunyangNeural"))
+        assertEquals(
+            EdgeProtocolConstants.DEFAULT_LOCALE,
+            LocaleCodes.localeOfVoiceName("")
+        )
+    }
 }

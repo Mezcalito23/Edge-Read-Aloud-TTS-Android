@@ -43,22 +43,41 @@ class EdgeProtocolClient(
         locale: String,
         rate: String,
         pitch: String,
-        onEncodedAudioChunk: (ByteArray) -> Unit,
+        onEncodedAudioChunk: (ByteArray, Int, Int) -> Unit,
         onComplete: () -> Unit,
         onError: (Throwable) -> Unit
     ): Cancellable {
-        val session = Session(text, voice, locale, rate, pitch, onEncodedAudioChunk, onComplete, onError)
-        session.connect()
-        return Cancellable { session.cancel() }
+        val turn = prepare(text, voice, locale, rate, pitch, onEncodedAudioChunk, onComplete, onError)
+        turn.start()
+        return turn
     }
 
-    private inner class Session(
+    fun prepare(
+        text: String,
+        voice: String,
+        locale: String,
+        rate: String,
+        pitch: String,
+        onEncodedAudioChunk: (ByteArray, Int, Int) -> Unit,
+        onComplete: () -> Unit,
+        onError: (Throwable) -> Unit
+    ): PreparedTurn {
+        val session = Session(text, voice, locale, rate, pitch, onEncodedAudioChunk, onComplete, onError)
+        return PreparedTurn(session)
+    }
+
+    inner class PreparedTurn internal constructor(private val session: Session) : Cancellable {
+        fun start() = session.connect()
+        override fun cancel() = session.cancel()
+    }
+
+    inner class Session(
         private val text: String,
         private val voice: String,
         private val locale: String,
         private val rate: String,
         private val pitch: String,
-        private val onEncodedAudioChunk: (ByteArray) -> Unit,
+        private val onEncodedAudioChunk: (ByteArray, Int, Int) -> Unit,
         private val onComplete: () -> Unit,
         private val onError: (Throwable) -> Unit
     ) {
@@ -127,6 +146,11 @@ class EdgeProtocolClient(
             fail(SynthesisCancelledException())
         }
 
+        private fun bumpWatchdog() {
+            if (finished.get() || cancelled.get()) return
+            scheduleWatchdog()
+        }
+
         private fun scheduleWatchdog() {
             watchdog?.cancel(false)
             watchdog = WATCHDOG.schedule(
@@ -134,13 +158,13 @@ class EdgeProtocolClient(
                     runCatching { socket?.cancel() }
                     fail(
                         TimeoutException(
-                            "La síntesis superó " +
-                                (EdgeProtocolConstants.SYNTHESIS_TIMEOUT_MS / 1000) +
-                                " s sin completarse"
+                            "La síntesis estuvo " +
+                                (EdgeProtocolConstants.IDLE_TIMEOUT_MS / 1000) +
+                                " s sin datos del servidor"
                         )
                     )
                 },
-                EdgeProtocolConstants.SYNTHESIS_TIMEOUT_MS,
+                EdgeProtocolConstants.IDLE_TIMEOUT_MS,
                 TimeUnit.MILLISECONDS
             )
         }
@@ -169,12 +193,13 @@ class EdgeProtocolClient(
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
+                bumpWatchdog()
                 val headers = AudioFrameParser.parseTextFrameHeaders(text)
                 val path = AudioFrameParser.pathOf(headers)
                 if (path != null) synchronized(pathSequence) { pathSequence += path }
                 when (path) {
                     EdgeProtocolConstants.PATH_TURN_START ->
-                        Log.i(TAG, "turn.start recibido")
+                        AppLog.i(TAG) { "turn.start recibido" }
 
                     EdgeProtocolConstants.PATH_TURN_END -> {
                         if (receivedAudio.get()) {
@@ -190,8 +215,7 @@ class EdgeProtocolClient(
 
                     EdgeProtocolConstants.PATH_RESPONSE -> {
                         val body = AudioFrameParser.bodyOf(text)
-                        val status = Regex("\"status\"\\s*:\\s*\"?(\\d{3})\"?")
-                            .find(body)?.groupValues?.get(1)?.toIntOrNull()
+                        val status = STATUS_JSON.find(body)?.groupValues?.get(1)?.toIntOrNull()
                         logDiag("Path:response status=${status ?: "n/d"} bytes=${body.length}")
                         if (status != null && status >= 400) {
                             fail(ProviderHttpException(status, "status $status"))
@@ -203,17 +227,21 @@ class EdgeProtocolClient(
             }
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                val raw = bytes.toByteArray()
+                bumpWatchdog()
                 val n = binaryFramesSeen.incrementAndGet()
-                val frame = AudioFrameParser.parseBinaryFrame(raw)
+                val frame = AudioFrameParser.parseBinaryFrame(bytes)
                 if (n <= 3) {
-                    logDiag("binario#$n len=${raw.size} path=${frame.path ?: "n/d"}")
+                    logDiag("binario#$n len=${bytes.size} path=${frame.path ?: "n/d"}")
+                }
+                if (frame.unexpectedAudioType()) {
+                    logDiag(
+                        "Content-Type inesperado=${frame.contentType()} bytes=${frame.payloadLength}"
+                    )
                 }
                 if (frame.path == EdgeProtocolConstants.PATH_AUDIO) {
-                    val payload = frame.payload
-                    if (payload.isNotEmpty() && !cancelled.get()) {
+                    if (frame.payloadLength > 0 && !cancelled.get()) {
                         receivedAudio.set(true)
-                        onEncodedAudioChunk(payload)
+                        onEncodedAudioChunk(frame.raw, frame.payloadOffset, frame.payloadLength)
                     }
                 }
             }
@@ -298,7 +326,7 @@ class EdgeProtocolClient(
                                 .put(
                                     "metadataoptions",
                                     JSONObject()
-                                        .put("sentenceBoundaryEnabled", "true")
+                                        .put("sentenceBoundaryEnabled", "false")
                                         .put("wordBoundaryEnabled", "false")
                                 )
                                 .put("outputFormat", outputFormat)
@@ -346,6 +374,8 @@ class EdgeProtocolClient(
         private val DIAG_IO = Executors.newSingleThreadExecutor { r ->
             Thread(r, "edge-tts-diag").apply { isDaemon = true }
         }
+
+        private val STATUS_JSON = Regex("\"status\"\\s*:\\s*\"?(\\d{3})\"?")
 
         fun generateSecMsGec(unixSeconds: Long, trustedClientToken: String): String =
             EdgeDrm.generateSecMsGec(unixSeconds, trustedClientToken)

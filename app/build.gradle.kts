@@ -8,6 +8,10 @@ android {
     namespace = "dev.experimental.edgetts"
     compileSdk = 36
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "dev.experimental.edgetts"
         minSdk = 26

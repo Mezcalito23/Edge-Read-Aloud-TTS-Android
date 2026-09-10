@@ -93,12 +93,14 @@
     <string name="user_agent_dialog_title">User-Agent de Edge</string>
     <string name="user_agent_dialog_hint">Usa el de Edge de ESCRITORIO con versión mayor y ceros. Verificado: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0 — El token Sec-MS-GEC usa la versión 1-143.0.3650.75 de forma independiente.</string>
     <string name="user_agent_updated">User-Agent actualizado. La próxima síntesis ya lo usa.</string>
+    <string name="user_agent_invalid">User-Agent rechazado: usa solo ASCII imprimible, sin saltos de línea.</string>
     <string name="user_agent_restored">User-Agent restaurado al valor verificado.</string>
 
     <!-- Origin -->
     <string name="origin_dialog_title">Origin del handshake</string>
     <string name="origin_dialog_hint">El handshake puede exigir un Origin concreto. Prueba, en orden: chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold (lector inmersivo, verificado) y https://www.bing.com. Se guarda y se usa en la próxima síntesis.</string>
     <string name="origin_updated">Origin actualizado. La próxima síntesis ya lo usa.</string>
+    <string name="origin_invalid">Origin rechazado: usa chrome-extension://, https:// o http://, sin caracteres de control.</string>
     <string name="origin_restored">Origin restaurado al valor verificado.</string>
 
     <!-- Errores de síntesis (motor) -->
