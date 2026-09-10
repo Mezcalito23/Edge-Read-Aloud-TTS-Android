@@ -1,5 +1,7 @@
 package dev.experimental.edgetts
 
+import okio.ByteString
+
 /**
  * Parser de los frames del protocolo WebSocket, aislado del cliente para
  * que un cambio de formato solo toque esta clase.
@@ -33,6 +35,11 @@ object AudioFrameParser {
 
         fun contentType(): String? =
             headers.entries.firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }?.value
+
+        fun unexpectedAudioType(): Boolean {
+            val type = contentType()?.trim()?.lowercase() ?: return payloadLength > 0
+            return type != "audio/mpeg" && type != "audio/mp3"
+        }
     }
 
     // ── Frames de texto ─────────────────────────────────────────────────────
@@ -64,9 +71,6 @@ object AudioFrameParser {
     /** Valor del header Path ("turn.end", "audio", …) o null. */
     fun pathOf(headers: Map<String, String>): String? =
         headers[EdgeProtocolConstants.HEADER_PATH]?.trim()
-
-    fun isTurnStart(headers: Map<String, String>): Boolean =
-        pathOf(headers) == EdgeProtocolConstants.PATH_TURN_START
 
     fun isTurnEnd(headers: Map<String, String>): Boolean =
         pathOf(headers) == EdgeProtocolConstants.PATH_TURN_END
@@ -118,6 +122,29 @@ object AudioFrameParser {
             raw = frame,
             payloadOffset = sep + 4
         )
+    }
+
+    /** Copia solo el payload; las cabeceras se leen desde la vista de ByteString. */
+    fun parseBinaryFrame(bytes: ByteString): BinaryFrame {
+        if (bytes.size >= 2) {
+            val headerLength =
+                ((bytes[0].toInt() and 0xFF) shl 8) or (bytes[1].toInt() and 0xFF)
+            val audioStart = headerLength + 2
+            if (headerLength in MIN_HEADER_LEN..minOf(bytes.size - 2, MAX_HEADER_LEN) &&
+                audioStart <= bytes.size
+            ) {
+                val headerText = String(
+                    bytes.substring(2, audioStart).toByteArray(),
+                    Charsets.US_ASCII
+                )
+                if (headerText.contains(EdgeProtocolConstants.HEADER_PATH)) {
+                    val payload = if (audioStart >= bytes.size) ByteArray(0)
+                    else bytes.substring(audioStart).toByteArray()
+                    return BinaryFrame(parseTextFrameHeaders(headerText), payload, 0)
+                }
+            }
+        }
+        return parseBinaryFrame(bytes.toByteArray())
     }
 
     private fun indexOfDoubleCrlf(b: ByteArray, from: Int, to: Int): Int {

@@ -570,7 +570,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
 
         val segments = runCatching {
-            TextSegmenter.segment(text, { stopRequested }, TextSegmenter.OPERATIONAL_SEGMENT_CHARS)
+            TextSegmenter.segment(text, { stopRequested }, TextSegmenter.OPERATIONAL_SEGMENT_BYTES)
         }.getOrElse {
             guard.error(callback, tr(R.string.error_segment_failed))
             return
@@ -731,7 +731,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val buffer = ByteArrayOutputStream()
 
         val client = http ?: return SegmentOutcome.Failed(tr(R.string.error_http_client))
-        val prov: TtsProvider = EdgeProtocolClient(
+        val prov = EdgeProtocolClient(
             client,
             drm = SharedProtocol.drm,
             wsBaseUrl = snap.wsUrl,
@@ -742,7 +742,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         )
 
         val netStart = android.os.SystemClock.elapsedRealtime()
-        val handle = prov.synthesize(
+        val handle = prov.prepare(
             text = segment,
             voice = voice,
             locale = LocaleCodes.localeOfVoiceName(voice),
@@ -754,8 +754,13 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             onComplete = { latch.countDown() },
             onError = { t -> failure = t; latch.countDown() }
         )
-
         active = handle
+        if (stopRequested) {
+            handle.cancel()
+            active = null
+            return SegmentOutcome.Cancelled
+        }
+        handle.start()
         var finished = false
         val deadline = android.os.SystemClock.elapsedRealtime() +
             EdgeProtocolConstants.SYNTHESIS_TIMEOUT_MS + 15_000L

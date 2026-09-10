@@ -83,7 +83,6 @@ object LocaleCodes {
 
     /**
      * Locale BCP-47 de un shortName Neural ("es-MX-DaliaNeural" → "es-MX").
-     * No lee K_LOCALE: esa preferencia nunca se escribió.
      */
     fun localeOfVoiceName(shortName: String): String {
         val parts = shortName.trim().split("-")
