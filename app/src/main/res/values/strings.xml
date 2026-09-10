@@ -48,7 +48,7 @@
 
     <!-- Caché -->
     <string name="cache_switch">Guardar audio sintetizado en este dispositivo</string>
-    <string name="cache_note">Clave SHA-256(texto+voz+locale+rate+pitch+versión). Máx. 100 MB; los archivos antiguos se eliminan solos.</string>
+    <string name="cache_note">Clave SHA-256(texto+voz+locale+rate+pitch+formato+versión). Máx. 100 MB; los archivos antiguos se eliminan solos.</string>
     <string name="cache_used_fmt">Ocupada: %1$s de %2$s</string>
     <string name="cache_freed_fmt">Caché borrada (%1$s liberados).</string>
 
@@ -100,4 +100,28 @@
     <string name="origin_dialog_hint">El handshake puede exigir un Origin concreto. Prueba, en orden: chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold (lector inmersivo, verificado) y https://www.bing.com. Se guarda y se usa en la próxima síntesis.</string>
     <string name="origin_updated">Origin actualizado. La próxima síntesis ya lo usa.</string>
     <string name="origin_restored">Origin restaurado al valor verificado.</string>
+
+    <!-- Errores de síntesis (motor) -->
+    <string name="error_cancelled">Síntesis cancelada por el usuario o por una solicitud nueva.</string>
+    <string name="error_undecodable">Audio no decodificable: %1$s.</string>
+    <string name="error_format_unknown">formato no reconocido</string>
+    <string name="error_no_audio">El servidor no envió audio: pudo rechazar el formato o el SSML solicitados.</string>
+    <string name="error_timeout">Tiempo de espera agotado: red lenta o servidor no disponible.</string>
+    <string name="error_eof">La conexión se cerró antes de recibir el audio completo (EOF).</string>
+    <string name="error_io">Fallo de red o el servidor cerró la conexión: %1$s</string>
+    <string name="error_no_detail">sin detalle</string>
+    <string name="error_unexpected">Error inesperado durante la síntesis: %1$s</string>
+    <string name="error_http_400">HTTP 400: SSML o formato inválido; el proveedor rechazó la petición.</string>
+    <string name="error_http_401">HTTP 401: contexto o autenticación inválida; el protocolo pudo haber cambiado.</string>
+    <string name="error_http_403">HTTP 403: acceso rechazado (ya se intentó renovar el contexto una vez). El protocolo no oficial pudo haber cambiado: prueba otro User-Agent y verifica la hora del dispositivo.</string>
+    <string name="error_http_404">HTTP 404: el endpoint ya no existe; el protocolo no oficial cambió.</string>
+    <string name="error_http_429">HTTP 429: límite de peticiones alcanzado. Reduce la frecuencia de síntesis.</string>
+    <string name="error_http_5xx">HTTP %1$d: fallo del servidor. Intenta más tarde.</string>
+    <string name="error_http_other">HTTP %1$d: respuesta inesperada. %2$s</string>
+    <string name="error_settings_unreadable">No se pudo leer la configuración local.</string>
+    <string name="error_segment_failed">No se pudo segmentar el texto.</string>
+    <string name="error_audio_start">No se pudo iniciar el canal de audio.</string>
+    <string name="error_audio_deliver">No se pudo entregar el audio al sistema.</string>
+    <string name="error_http_client">Cliente HTTP no inicializado.</string>
+    <string name="error_empty_audio">El proveedor no devolvió audio (respuesta vacía).</string>
 </resources>

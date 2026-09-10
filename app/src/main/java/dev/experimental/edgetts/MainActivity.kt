@@ -21,11 +21,9 @@ import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
-import okhttp3.OkHttpClient
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 /**
  * Pantalla de configuración del motor (accesible también desde
@@ -90,10 +88,7 @@ class SettingsController(private val activity: Activity) {
     private val store = SettingsStore(activity.applicationContext)
     private val cacheRepo = CacheRepository(activity.cacheDir)
     private val catalog = VoiceCatalogRepository(
-        OkHttpClient.Builder()
-            .connectTimeout(EdgeProtocolConstants.CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            .readTimeout(EdgeProtocolConstants.READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            .build(),
+        SharedProtocol.http,
         activity.cacheDir,
         SharedProtocol.drm,
         snapshotProvider = { store.snapshot() }
