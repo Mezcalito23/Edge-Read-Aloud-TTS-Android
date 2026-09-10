@@ -16,26 +16,15 @@ package dev.experimental.edgetts
  */
 object SsmlBuilder {
 
-    /** Escapa los cinco caracteres XML, en el orden correcto (& primero). */
-    fun escapeXml(raw: String): String = buildString(raw.length + 16) {
-        for (c in raw) {
-            when (c) {
-                '&' -> append("&amp;")
-                '<' -> append("&lt;")
-                '>' -> append("&gt;")
-                '"' -> append("&quot;")
-                '\'' -> append("&apos;")
-                else -> append(c)
-            }
-        }
-    }
+    /** Escapa XML 1.0 (delegado: surrogates ilegales → U+FFFD). */
+    fun escapeXml(raw: String): String = TextSanitizer.escapeXml(raw)
 
     /**
      * "+0%", "+25%", "-10%"… recortado al rango que el servicio permite:
      * -50%..+100% (el extremo superior honra el slider del sistema a 2.0x;
      * el extremo inferior coincide con el mínimo del protocolo).
      */
-    fun signedPercent(percent: Int): String = signed(percent.coerceIn(-50, 50), "%")
+    fun signedPercent(percent: Int): String = signed(percent.coerceIn(-50, 100), "%")
 
     /** "+0Hz", "-4Hz"… recortado al rango ±50. */
     fun signedHertz(hertz: Int): String = signed(hertz.coerceIn(-50, 50), "Hz")

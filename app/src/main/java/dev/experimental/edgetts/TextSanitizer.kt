@@ -52,4 +52,44 @@ object TextSanitizer {
     fun sanitize(text: String): String {
         return normalizeSpaces(removeIncompatibleCharacters(text))
     }
+
+    fun escapeXml(raw: String): String = buildString(raw.length + 16) {
+        var index = 0
+        while (index < raw.length) {
+            val ch = raw[index]
+            val point: Int
+            val width: Int
+            when {
+                Character.isHighSurrogate(ch) &&
+                    index + 1 < raw.length &&
+                    Character.isLowSurrogate(raw[index + 1]) -> {
+                    point = Character.toCodePoint(ch, raw[index + 1])
+                    width = 2
+                }
+                Character.isSurrogate(ch) -> {
+                    point = 0xFFFD
+                    width = 1
+                }
+                else -> {
+                    point = ch.code
+                    width = 1
+                }
+            }
+            if (!isXml10CodePoint(point)) append('\uFFFD')
+            else when (point) {
+                '&'.code -> append("\u0026amp;")
+                '<'.code -> append("\u0026lt;")
+                '>'.code -> append("\u0026gt;")
+                '"'.code -> append("\u0026quot;")
+                '\''.code -> append("\u0026apos;")
+                else -> appendCodePoint(point)
+            }
+            index += width
+        }
+    }
+
+    private fun isXml10CodePoint(point: Int): Boolean =
+        point == 0x9 || point == 0xA || point == 0xD ||
+            point in 0x20..0xD7FF || point in 0xE000..0xFFFD ||
+            point in 0x10000..0x10FFFF
 }

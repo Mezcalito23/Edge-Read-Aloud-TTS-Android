@@ -30,7 +30,10 @@ class SsmlBuilderTest {
         assertEquals("+0%", SsmlBuilder.signedPercent(0))
         assertEquals("+25%", SsmlBuilder.signedPercent(25))
         assertEquals("-10%", SsmlBuilder.signedPercent(-10))
-        assertEquals("+50%", SsmlBuilder.signedPercent(999))   // recortado
+        assertEquals("+50%", SsmlBuilder.signedPercent(50))
+        assertEquals("+100%", SsmlBuilder.signedPercent(100))
+        assertEquals("+100%", SsmlBuilder.signedPercent(999))
+        assertEquals("-50%", SsmlBuilder.signedPercent(-999))
         assertEquals("-50Hz", SsmlBuilder.signedHertz(-999))   // recortado
         assertEquals("+0Hz", SsmlBuilder.signedHertz(0))
     }
