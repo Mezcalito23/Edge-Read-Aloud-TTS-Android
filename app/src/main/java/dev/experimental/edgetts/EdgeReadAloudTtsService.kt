@@ -606,13 +606,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 }.isSuccess
             } else true
 
-        if (!ensureStarted(EdgeProtocolConstants.SAMPLE_RATE_HZ)) {
-            guard.error(callback, tr(R.string.error_audio_start))
-            return
-        }
-
-        var charBase = 0
-        var framesDelivered = 0
         try {
             for (segment in segments) {
                 if (guard.isFired) return
@@ -623,18 +616,9 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
                 when (val outcome = synthesizeSegment(segment, snap, voice, rate, pitch, metrics)) {
                     is SegmentOutcome.Ok -> {
-                        val ranges = if (outcome.ranges.isNotEmpty()) outcome.ranges
-                        else listOf(AudioFrameParser.TimedRange(0L, 0, segment.length))
-                        for (r in ranges) {
-                            val marker = framesDelivered +
-                                AudioFrameParser.ticksToFrames(r.offsetTicks, outcome.sampleRateHz)
-                            runCatching {
-                                callback.rangeStart(
-                                    marker,
-                                    charBase + r.start,
-                                    charBase + r.end
-                                )
-                            }
+                        if (!ensureStarted(outcome.sampleRateHz)) {
+                            guard.error(callback, tr(R.string.error_audio_start))
+                            return
                         }
                         if (!deliver(outcome.pcm, callback)) {
                             if (stopRequested) {
@@ -646,8 +630,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                             }
                             return
                         }
-                        framesDelivered += outcome.pcm.size / 2
-                        charBase += segment.length
                     }
 
                     is SegmentOutcome.Failed -> {
@@ -671,11 +653,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     }
 
     private sealed class SegmentOutcome {
-        class Ok(
-            val pcm: ByteArray,
-            val sampleRateHz: Int,
-            val ranges: List<AudioFrameParser.TimedRange> = emptyList()
-        ) : SegmentOutcome()
+        class Ok(val pcm: ByteArray, val sampleRateHz: Int) : SegmentOutcome()
         class Failed(val message: String) : SegmentOutcome()
         object Cancelled : SegmentOutcome()
     }
@@ -763,7 +741,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         )
 
         val netStart = android.os.SystemClock.elapsedRealtime()
-        val metaBodies = ArrayList<String>()
         val handle = prov.prepare(
             text = segment,
             voice = voice,
@@ -774,8 +751,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 synchronized(buffer) { buffer.write(data, off, len) }
             },
             onComplete = { latch.countDown() },
-            onError = { t -> failure = t; latch.countDown() },
-            onAudioMetadata = { body -> synchronized(metaBodies) { metaBodies += body } }
+            onError = { t -> failure = t; latch.countDown() }
         )
         active = handle
         if (stopRequested) {
@@ -822,10 +798,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val decoded = decodeMp3(mp3, metrics)
         if (decoded is SegmentOutcome.Ok && snap.cacheEnabled && cacheKey != null) {
             runCatching { cache?.writeMp3(cacheKey, mp3) }
-        }
-        if (decoded is SegmentOutcome.Ok) {
-            val ranges = AudioFrameParser.parseTimedRanges(metaBodies, segment)
-            return SegmentOutcome.Ok(decoded.pcm, decoded.sampleRateHz, ranges)
         }
         return decoded
     }
