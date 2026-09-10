@@ -71,7 +71,7 @@ class EdgeDrm(private val state: ProtocolState) {
     }
 
     fun jsTimestamp(withTrailingZ: Boolean = false): String {
-        val stamp = JS_STAMP.get().format(Date())
+        val stamp = checkNotNull(JS_STAMP.get()).format(Date())
         return if (withTrailingZ) stamp + "Z" else stamp
     }
 
@@ -97,7 +97,8 @@ class EdgeDrm(private val state: ProtocolState) {
         attempt: Int
     ): String {
         val nowSeconds = unixSeconds()
-        val windowUtc = WINDOW_STAMP.get().format(Date((nowSeconds - nowSeconds % 300) * 1000))
+        val windowUtc = checkNotNull(WINDOW_STAMP.get())
+            .format(Date((nowSeconds - nowSeconds % 300) * 1000))
         return "GEC=${gec.take(8)}… · ventana=$windowUtc UTC · versión=$version" +
             " · MUID=${muid.take(8)}… · Origin=${origin.take(24)}…" +
             " · UA=…${userAgent.substringAfterLast(' ')}" +
@@ -142,7 +143,7 @@ class EdgeDrm(private val state: ProtocolState) {
         }
 
         fun parseRfc2616Date(date: String): Long? = runCatching {
-            RFC2616.get().parse(date.trim())?.time?.div(1000)
+            checkNotNull(RFC2616.get()).parse(date.trim())?.time?.div(1000)
         }.getOrNull()
 
         fun redactUrl(url: String): String {

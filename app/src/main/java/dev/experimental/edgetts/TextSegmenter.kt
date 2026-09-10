@@ -127,11 +127,16 @@ object TextSegmenter {
         val out = ArrayList<String>()
         var offset = 0
         while (offset < bytes.size) {
-            var end = minOf(offset + MAX_SEGMENT_BYTES, bytes.size)
-            while (end > offset && isUtf8Continuation(bytes[end - 1])) end--
+            val limit = minOf(offset + MAX_SEGMENT_BYTES, bytes.size)
+            var end = offset
+            while (end < limit) {
+                val width = utf8Width(bytes[end])
+                if (end + width > limit) break
+                end += width
+            }
             if (end == offset) {
-                end = minOf(offset + 1, bytes.size)
-                while (end < bytes.size && isUtf8Continuation(bytes[end])) end++
+                val width = utf8Width(bytes[offset]).coerceAtLeast(1)
+                end = minOf(offset + width, bytes.size)
             }
             out += String(bytes, offset, end - offset, Charsets.UTF_8)
             offset = end
@@ -139,7 +144,16 @@ object TextSegmenter {
         return out
     }
 
-    private fun isUtf8Continuation(value: Byte): Boolean = (value.toInt() and 0xC0) == 0x80
+    private fun utf8Width(lead: Byte): Int {
+        val v = lead.toInt() and 0xFF
+        return when {
+            v < 0x80 -> 1
+            v and 0xE0 == 0xC0 -> 2
+            v and 0xF0 == 0xE0 -> 3
+            v and 0xF8 == 0xF0 -> 4
+            else -> 1
+        }
+    }
 
     private val PARAGRAPH_SPLIT = Regex("\\n+")
     private val SENTENCE_SPLIT = Regex("(?<=[.!?…;:])\\s+")

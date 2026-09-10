@@ -18,7 +18,8 @@ class HeaderPolicyTest {
         assertFalse(HeaderPolicy.isUserAgent("Mozilla\nBad"))
         assertFalse(HeaderPolicy.isUserAgent("Mozilla\u0000"))
         assertFalse(HeaderPolicy.isUserAgent("Mozilla 😀"))
-        assertFalse(HeaderPolicy.isOrigin("https://www.bing.com\n"))
+        assertFalse(HeaderPolicy.isOrigin("https://www.bing.com\nextra"))
+        assertTrue(HeaderPolicy.isOrigin("https://www.bing.com\n"))
     }
 
     @Test
