@@ -42,7 +42,7 @@ class EngineContractTest {
     @Test
     fun engineLoadsSpanishMexicoAndExposesDalia() {
         withEngine { tts ->
-            val available = tts.isLanguageAvailable(Locale("es", "MX"))
+            val available = tts.isLanguageAvailable(Locale.forLanguageTag("es-MX"))
             assertTrue(
                 "es-MX no disponible (código $available)",
                 available >= TextToSpeech.LANG_AVAILABLE
@@ -105,7 +105,7 @@ class EngineContractTest {
             val stopResult = tts.stop()
             assertEquals("stop() debe devolver SUCCESS", TextToSpeech.SUCCESS, stopResult)
             // El motor sigue vivo y responde.
-            assertTrue(tts.isLanguageAvailable(Locale("es", "MX")) >= TextToSpeech.LANG_AVAILABLE)
+            assertTrue(tts.isLanguageAvailable(Locale.forLanguageTag("es-MX")) >= TextToSpeech.LANG_AVAILABLE)
         }
     }
 
