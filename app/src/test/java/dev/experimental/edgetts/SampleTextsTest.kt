@@ -29,7 +29,21 @@ class SampleTextsTest {
     }
 
     @Test
-    fun iso3ChineseMapsToZhSample() {
-        assertTrue(SampleTexts.forRequested("zho", "CHN").contains("你好"))
+    fun chineseVoiceDoesNotSpeakSpanishDemo() {
+        val out = SampleTexts.alignDemo(
+            "Esta es una demostración de la síntesis de voz.",
+            "zh-CN-XiaoxiaoNeural"
+        )
+        assertTrue(out.contains("你好"))
+    }
+
+    @Test
+    fun forceReplacesAnyShortText() {
+        val out = SampleTexts.alignDemo(
+            "cualquier texto corto de ajustes",
+            "ja-JP-NanamiNeural",
+            force = true
+        )
+        assertTrue(out.contains("こんにちは"))
     }
 }

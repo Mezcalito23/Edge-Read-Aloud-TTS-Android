@@ -13,8 +13,11 @@ class GetSampleText : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val lang = requestedLanguage()
+        val country = requestedCountry()
+        SharedProtocol.markSettingsSample(lang.orEmpty(), country.orEmpty())
         val sample = runCatching {
-            SampleTexts.forRequested(requestedLanguage(), requestedCountry())
+            SampleTexts.forRequested(lang, country)
         }.getOrElse { SampleTexts.forIso2("en") }
         setResult(
             RESULT_OK,
