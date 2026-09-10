@@ -570,7 +570,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
 
         val segments = runCatching {
-            TextSegmenter.segment(text, { stopRequested }, TextSegmenter.OPERATIONAL_SEGMENT_BYTES)
+            TextSegmenter.segment(text, { stopRequested }, TextSegmenter.OPERATIONAL_SEGMENT_CHARS)
         }.getOrElse {
             guard.error(callback, tr(R.string.error_segment_failed))
             return
@@ -606,9 +606,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 }.isSuccess
             } else true
 
-        val textLen = raw.length
-        var charBase = 0
-        var framesDelivered = 0
         try {
             for (segment in segments) {
                 if (guard.isFired) return
@@ -623,13 +620,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                             guard.error(callback, tr(R.string.error_audio_start))
                             return
                         }
-                        val pcmFrames = (outcome.pcm.size / 2).coerceAtLeast(1)
-                        val ranges = if (outcome.ranges.isNotEmpty()) outcome.ranges
-                        else AudioFrameParser.estimateWordRanges(segment, pcmFrames)
-                        emitRangeStarts(
-                            callback, ranges, outcome.sampleRateHz,
-                            framesDelivered, charBase, textLen
-                        )
                         if (!deliver(outcome.pcm, callback)) {
                             if (stopRequested) {
                                 guard.error(callback, TextToSpeech.STOPPED)
@@ -640,8 +630,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                             }
                             return
                         }
-                        framesDelivered += outcome.pcm.size / 2
-                        charBase += segment.length
                     }
 
                     is SegmentOutcome.Failed -> {
@@ -665,11 +653,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     }
 
     private sealed class SegmentOutcome {
-        class Ok(
-            val pcm: ByteArray,
-            val sampleRateHz: Int,
-            val ranges: List<AudioFrameParser.TimedRange> = emptyList()
-        ) : SegmentOutcome()
+        class Ok(val pcm: ByteArray, val sampleRateHz: Int) : SegmentOutcome()
         class Failed(val message: String) : SegmentOutcome()
         object Cancelled : SegmentOutcome()
     }
@@ -757,7 +741,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         )
 
         val netStart = android.os.SystemClock.elapsedRealtime()
-        val metaBodies = ArrayList<String>()
         val handle = prov.prepare(
             text = segment,
             voice = voice,
@@ -768,8 +751,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 synchronized(buffer) { buffer.write(data, off, len) }
             },
             onComplete = { latch.countDown() },
-            onError = { t -> failure = t; latch.countDown() },
-            onAudioMetadata = { body -> synchronized(metaBodies) { metaBodies += body } }
+            onError = { t -> failure = t; latch.countDown() }
         )
         active = handle
         if (stopRequested) {
@@ -817,35 +799,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         if (decoded is SegmentOutcome.Ok && snap.cacheEnabled && cacheKey != null) {
             runCatching { cache?.writeMp3(cacheKey, mp3) }
         }
-        if (decoded is SegmentOutcome.Ok) {
-            val ranges = AudioFrameParser.parseTimedRanges(metaBodies, segment)
-            return SegmentOutcome.Ok(decoded.pcm, decoded.sampleRateHz, ranges)
-        }
         return decoded
-    }
-
-    /**
-     * Marcas para Play Books. AudioTrack ignora el frame 0, así que el
-     * marcador nunca es 0. Índices recortados al texto original del request.
-     */
-    private fun emitRangeStarts(
-        callback: SynthesisCallback,
-        ranges: List<AudioFrameParser.TimedRange>,
-        sampleRateHz: Int,
-        framesDelivered: Int,
-        charBase: Int,
-        textLen: Int
-    ) {
-        if (textLen <= 0) return
-        for (r in ranges) {
-            val start = (charBase + r.start).coerceIn(0, textLen)
-            val end = (charBase + r.end).coerceIn(start, textLen)
-            if (end <= start) continue
-            val marker = (
-                framesDelivered + AudioFrameParser.ticksToFrames(r.offsetTicks, sampleRateHz)
-                ).coerceAtLeast(1)
-            runCatching { callback.rangeStart(marker, start, end) }
-        }
     }
 
     /**
