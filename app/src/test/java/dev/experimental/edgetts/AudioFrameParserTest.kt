@@ -125,7 +125,7 @@ class AudioFrameParserTest {
         assertEquals(4, ranges[0].end)
         assertEquals(5, ranges[1].start)
         assertEquals(10, ranges[1].end)
-        assertEquals(120, AudioFrameParser.ticksToFrames(5_000_000L, 24000))
+        assertEquals(12_000, AudioFrameParser.ticksToFrames(5_000_000L, 24000))
     }
 
     @Test
