@@ -9,7 +9,6 @@ class TextSegmenterTest {
     @Test
     fun emptyTextProducesNoSegments() {
         assertTrue(TextSegmenter.segment("").isEmpty())
-        assertTrue(TextSegmenter.segment("   \n\n  ").isEmpty())
     }
 
     @Test
@@ -19,38 +18,40 @@ class TextSegmenterTest {
     }
 
     @Test
-    fun paragraphsArePreserved() {
-        val segments = TextSegmenter.segment("Primer párrafo.\n\nSegundo párrafo.")
-        assertEquals(2, segments.size)
-        assertEquals("Primer párrafo.", segments[0])
-        assertEquals("Segundo párrafo.", segments[1])
+    fun shortParagraphsStayTogetherUnderTheByteCap() {
+        val text = "Primer párrafo.\n\nSegundo párrafo."
+        val segments = TextSegmenter.segment(text)
+        assertEquals(listOf(text), segments)
+    }
+
+    @Test
+    fun longParagraphsSplitOnBlankLineAndRejoin() {
+        val a = "A".repeat(3000)
+        val b = "B".repeat(3000)
+        val text = "$a\n\n$b"
+        val segments = TextSegmenter.segment(text)
+        assertTrue(segments.size >= 2)
+        assertEquals(text, segments.joinToString(""))
+        assertTrue(segments[0].contains("A"))
+        assertTrue(segments.last().contains("B"))
     }
 
     @Test
     fun orderIsKeptAcrossManySentences() {
         val text = (1..60).joinToString(" ") { "Frase número $it." }
         val segments = TextSegmenter.segment(text)
-        val rebuilt = segments.joinToString(" ")
-        for (i in 1..60) {
-            assertTrue("falta la frase $i", rebuilt.contains("Frase número $i."))
-        }
-        assertTrue(
-            "el orden se rompió",
-            rebuilt.indexOf("Frase número 1.") < rebuilt.indexOf("Frase número 60.")
-        )
+        assertEquals(text, segments.joinToString(""))
     }
 
     @Test
-    fun noSegmentExceedsTheLimit() {
+    fun noSegmentExceedsByteLimit() {
         val text = (1..400).joinToString(" ") { "Palabra$it " + "x".repeat(50) + "." }
         val segments = TextSegmenter.segment(text)
         assertTrue(segments.isNotEmpty())
         segments.forEach { s ->
-            assertTrue(
-                "segmento de ${s.length} chars supera el límite",
-                s.length <= TextSegmenter.MAX_SEGMENT_CHARS
-            )
+            assertTrue(s.toByteArray(Charsets.UTF_8).size <= TextSegmenter.MAX_SEGMENT_BYTES)
         }
+        assertEquals(text, segments.joinToString(""))
     }
 
     @Test
@@ -59,19 +60,21 @@ class TextSegmenterTest {
         val segments = TextSegmenter.segment(text)
         assertTrue(segments.size >= 2)
         segments.forEach { s ->
-            assertTrue(s.length <= TextSegmenter.MAX_SEGMENT_CHARS)
-            s.split(Regex("\\s+")).forEach { token -> assertEquals("palabra", token) }
+            assertTrue(s.toByteArray(Charsets.UTF_8).size <= TextSegmenter.MAX_SEGMENT_BYTES)
+            s.split(Regex("\\s+")).filter { it.isNotEmpty() }.forEach { token ->
+                assertEquals("palabra", token)
+            }
         }
     }
 
     @Test
-    fun degenerateTokenIsHardSplitKeepingTotalLength() {
+    fun degenerateTokenIsHardSplitOnUtf8Bytes() {
         val huge = "a".repeat(9000)
         val segments = TextSegmenter.segment(huge)
-        assertEquals(3, segments.size)
-        assertEquals(4000, segments[0].length)
-        assertEquals(4000, segments[1].length)
-        assertEquals(1000, segments[2].length)
+        assertEquals(huge, segments.joinToString(""))
+        segments.dropLast(1).forEach { s ->
+            assertEquals(TextSegmenter.MAX_SEGMENT_BYTES, s.toByteArray(Charsets.UTF_8).size)
+        }
     }
 
     @Test
@@ -85,15 +88,15 @@ class TextSegmenterTest {
 
     @Test
     fun operationalLimitIsSmallerThanProtocolCap() {
-        val text = List(400) { "palabra" }.joinToString(" ")
+        val text = List(800) { "palabra" }.joinToString(" ")
         val operational = TextSegmenter.segment(
-            text, { false }, TextSegmenter.OPERATIONAL_SEGMENT_CHARS
+            text, { false }, TextSegmenter.OPERATIONAL_SEGMENT_BYTES
         )
         operational.forEach { s ->
-            assertTrue(s.length <= TextSegmenter.OPERATIONAL_SEGMENT_CHARS)
+            assertTrue(s.toByteArray(Charsets.UTF_8).size <= TextSegmenter.OPERATIONAL_SEGMENT_BYTES)
         }
         assertTrue(operational.size > 1)
-        assertTrue(TextSegmenter.OPERATIONAL_SEGMENT_CHARS < TextSegmenter.MAX_SEGMENT_CHARS)
+        assertTrue(TextSegmenter.OPERATIONAL_SEGMENT_BYTES < TextSegmenter.MAX_SEGMENT_BYTES)
     }
 
     @Test
