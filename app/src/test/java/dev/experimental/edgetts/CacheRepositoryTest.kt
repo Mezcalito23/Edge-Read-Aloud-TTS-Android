@@ -70,12 +70,11 @@ class CacheRepositoryTest {
 
     @Test
     fun lruEvictsOldestWithoutTouchingIncomingKey() {
-        val small = CacheRepository(root, maxBytes = 8)
+        val small = CacheRepository(root, maxBytes = 7)
         assertTrue(small.write("old", pcm))
-        Thread.sleep(5)
-        File(pcmDir(), "old.pcm").setLastModified(1L)
         assertTrue(small.write("new", other))
         assertNull(small.read("old"))
         assertArrayEquals(other, small.read("new"))
+        assertFalse(File(pcmDir(), "new.pcm.tmp").exists())
     }
 }
