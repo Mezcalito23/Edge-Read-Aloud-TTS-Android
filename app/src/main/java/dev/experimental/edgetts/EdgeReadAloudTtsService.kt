@@ -208,6 +208,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val code = languageAvailability(lang, country)
         if (code >= TextToSpeech.LANG_AVAILABLE) {
             currentLanguage = arrayOf(lang, country, variant)
+            SharedProtocol.noteSampleLocale(lang, country)
         }
         AppLog.d(TAG) { "onLoadLanguage($lang,$country,$variant) → $code" }
         return code
@@ -254,6 +255,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val snap = settings?.snapshot()
             ?: return voiceForLanguage(lang, country)
         val resolved = resolveDefaultVoiceFor(lang, country, snap)
+        SharedProtocol.noteSampleLocale(lang, country)
         AppLog.d(TAG) { "onGetDefaultVoiceNameFor($lang,$country,$variant) → ${resolved ?: "null"} (unificado=${snap.unifiedVoiceMode})" }
         return resolved
     }
@@ -387,7 +389,17 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             return
         }
 
-        val text = TextSanitizer.removeIncompatibleCharacters(raw)
+        val snap = settings?.snapshot()
+        if (snap == null) {
+            guard.error(callback, tr(R.string.error_settings_unreadable))
+            return
+        }
+
+        val voice = resolveVoice(request, snap)
+        val text = SampleTexts.alignDemo(
+            TextSanitizer.removeIncompatibleCharacters(raw),
+            voice
+        )
         if (text.isBlank()) {
             runCatching {
                 callback.start(
@@ -397,12 +409,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 )
             }
             guard.done(callback)
-            return
-        }
-
-        val snap = settings?.snapshot()
-        if (snap == null) {
-            guard.error(callback, tr(R.string.error_settings_unreadable))
             return
         }
 
@@ -425,7 +431,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             return
         }
 
-        val voice = resolveVoice(request, snap)
         AppLog.d(TAG) {
             "voz resuelta=$voice unificado=${snap.unifiedVoiceMode} pedida=${request.voiceName ?: ""}"
         }
