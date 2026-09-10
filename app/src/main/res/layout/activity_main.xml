@@ -213,17 +213,6 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:text="@string/unified_voice_hint" />
-
-            <TextView
-                android:id="@+id/textVoiceDisclaimer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@color/warning_bg"
-                android:padding="10dp"
-                android:text="@string/voice_source_disclaimer"
-                android:textColor="@color/warning_text"
-                android:textSize="12.5sp" />
         </LinearLayout>
 
         <!-- Velocidad y tono -->

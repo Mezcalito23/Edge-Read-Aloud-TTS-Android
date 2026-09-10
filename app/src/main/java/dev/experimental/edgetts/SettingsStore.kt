@@ -59,7 +59,7 @@ class SettingsStore(context: Context) {
                 userAgent = EdgeProtocolConstants.DEFAULT_USER_AGENT,
                 origin = EdgeProtocolConstants.DEFAULT_ORIGIN,
                 uiLanguage = "",
-                unifiedVoiceMode = true,
+                unifiedVoiceMode = false,
                 lastSpanishVoice = EdgeProtocolConstants.DEFAULT_VOICE,
                 lastError = "",
                 handshakeDebug = "",
@@ -123,7 +123,10 @@ class SettingsStore(context: Context) {
     }
 
     fun setUnifiedVoiceMode(enabled: Boolean) =
-        applyAndPersist({ it.copy(unifiedVoiceMode = enabled) }) { it[K_UNIFIED_VOICE] = enabled }
+        applyAndPersist({ it.copy(unifiedVoiceMode = enabled) }) {
+            it[K_UNIFIED_VOICE] = enabled
+            it[K_VOICE_POLICY] = 2
+        }
 
     fun setLastSpanishVoice(voice: String) =
         applyAndPersist({ it.copy(lastSpanishVoice = voice) }) { it[K_LAST_ES_VOICE] = voice }
@@ -185,6 +188,7 @@ class SettingsStore(context: Context) {
         val K_ORIGIN = stringPreferencesKey("origin")
         val K_UI_LANG = stringPreferencesKey("ui_language")
         val K_UNIFIED_VOICE = booleanPreferencesKey("unified_voice_mode")
+        val K_VOICE_POLICY = intPreferencesKey("voice_policy")
         val K_LAST_ES_VOICE = stringPreferencesKey("last_spanish_voice")
         val K_LAST_ERROR = stringPreferencesKey("last_error")
         val K_HS_DEBUG = stringPreferencesKey("handshake_debug")
@@ -213,7 +217,8 @@ class SettingsStore(context: Context) {
                 prefs[K_ORIGIN] ?: EdgeProtocolConstants.DEFAULT_ORIGIN
             ),
             uiLanguage = prefs[K_UI_LANG].orEmpty(),
-            unifiedVoiceMode = prefs[K_UNIFIED_VOICE] ?: true,
+            unifiedVoiceMode = if ((prefs[K_VOICE_POLICY] ?: 0) < 2) false
+                else (prefs[K_UNIFIED_VOICE] ?: false),
             lastSpanishVoice = prefs[K_LAST_ES_VOICE] ?: EdgeProtocolConstants.DEFAULT_VOICE,
             lastError = prefs[K_LAST_ERROR].orEmpty(),
             handshakeDebug = prefs[K_HS_DEBUG].orEmpty(),
