@@ -70,14 +70,11 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         cache = CacheRepository(app.cacheDir)
         catalog?.cached()
 
-        // Idioma inicial: el del dispositivo, si el catálogo lo cubre;
-        // si no, español de México. Así el "idioma predeterminado" del motor
-        // coincide con el sistema desde el primer momento.
         runCatching {
-            val dev = Locale.getDefault()
-            if (languageAvailability(dev.language, dev.country) >= TextToSpeech.LANG_AVAILABLE) {
-                currentLanguage = arrayOf(dev.language, dev.country, "")
-            }
+            val configured = settings?.snapshot()?.voice ?: EdgeProtocolConstants.DEFAULT_VOICE
+            val tag = LocaleCodes.localeOfVoiceName(configured)
+            val loc = java.util.Locale.forLanguageTag(tag)
+            currentLanguage = arrayOf(loc.language, loc.country, "")
         }
     }
 
@@ -148,50 +145,14 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     // ve afectado por exponer el catálogo completo.
 
     /**
-     * Resuelve la voz para un idioma (y país opcional). Compara en ISO3
-     * (robusto a entradas ISO2 o ISO3). Prioridad:
-     *  1. Si se especifica un PAÍS y el catálogo tiene una voz para ese país,
-     *     se respeta el país (el Settings manda sobre la variante). Esto hace
-     *     que "Español (Nicaragua)" en Ajustes suene con voz nicaragüense y
-     *     no con la voz mexicana configurada —era la queja principal—.
-     *     Excepción: si la voz configurada en la app es de ESE mismo país, se
-     *     usa la configurada (respeta la elección del usuario).
-     *  2. Sin país (o país sin voz en catálogo): si la voz configurada es de
-     *     este idioma, se usa (modelo de la app: la voz elegida aplica al
-     *     sistema para su idioma).
-     *  3. Primera voz del idioma en el catálogo.
+     * Resuelve la voz para un idioma (y país opcional). Delegado en
+     * [VoiceResolver]: el país de Ajustes gana (España ≠ México).
      */
     private fun voiceForLanguage(lang: String, country: String = ""): String? {
-        val l3 = normLang(lang)
-        if (l3.isEmpty()) return null
         val configuredName = runCatching { settings?.snapshot()?.voice }
             .getOrNull() ?: EdgeProtocolConstants.DEFAULT_VOICE
-        val configuredLang3 = normLang(configuredName.substringBefore("-"))
         val catalogVoices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
-        val c3 = normCountry(country)
-
-        // 1) País especificado con voz en el catálogo → respetar el país.
-        if (c3.isNotEmpty()) {
-            val countryVoice = catalogVoices.firstOrNull {
-                normLang(it.locale.substringBefore("-")) == l3 &&
-                    normCountry(it.locale.substringAfter("-", "")) == c3
-            }
-            if (countryVoice != null) {
-                val configuredCountry3 = normCountry(configuredName.substringAfter("-", ""))
-                if (configuredLang3 == l3 && configuredCountry3 == c3) {
-                    return validatedVoice(configuredName)
-                }
-                return countryVoice.shortName
-            }
-        }
-
-        // 2) La voz configurada aplica a su idioma (modelo de la app).
-        if (configuredLang3 == l3) return validatedVoice(configuredName)
-
-        // 3) Primera voz del idioma.
-        return catalogVoices.firstOrNull {
-            normLang(it.locale.substringBefore("-")) == l3
-        }?.shortName
+        return VoiceResolver.voiceForLanguage(lang, country, configuredName, catalogVoices)
     }
 
     // ── Resiliencia a cambios del catálogo de Microsoft ─────────────────────
@@ -201,11 +162,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     // confuso). validatedVoice() garantiza que solo se sintetice con voces
     // presentes en el catálogo descargado, con un respaldo razonable.
 
-    /** Nombres de voz presentes en el catálogo (vacío si aún no se descarga). */
-    private fun catalogShortNames(): Set<String> =
-        runCatching { catalog?.cached() }.getOrNull().orEmpty()
-            .map { it.shortName }.toSet()
-
     /**
      * Si [voice] existe en el catálogo se devuelve tal cual; si no (voz
      * retirada por Microsoft o catálogo desactualizado) se busca un respaldo:
@@ -214,21 +170,10 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
      * validar).
      */
     private fun validatedVoice(voice: String): String {
-        val names = catalogShortNames()
-        if (names.isEmpty()) return voice
-        if (voice in names) return voice
-
-        val lang = voice.substringBefore("-").lowercase(Locale.ROOT)
-        val byLang = runCatching { catalog?.cached() }.getOrNull().orEmpty()
-            .firstOrNull { it.locale.substringBefore("-").lowercase(Locale.ROOT) == lang }
-        if (byLang != null) {
-            Log.w(TAG, "La voz '$voice' ya no está en el catálogo; usando ${byLang.shortName}")
-            return byLang.shortName
-        }
-
         val configured = runCatching { settings?.snapshot()?.voice }
             .getOrNull() ?: EdgeProtocolConstants.DEFAULT_VOICE
-        return if (configured in names) configured else EdgeProtocolConstants.DEFAULT_VOICE
+        val catalogVoices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
+        return VoiceResolver.validated(voice, configured, catalogVoices)
     }
 
     // ── Normalización ISO3 ──────────────────────────────────────────────────
@@ -329,50 +274,26 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     }
 
     /**
-     * Resolución por defecto de voz para un locale — la ÚNICA fuente de
-     * verdad que comparten onGetDefaultVoiceNameFor() y resolveVoice(). Si
-     * divergieran, el sistema prometería una voz (vía onGetDefaultVoiceNameFor)
-     * y la síntesis usaría otra cuando voiceName llega vacío.
-     *
-     * MODELO 1 — LA VOZ DE LA APP MANDA (verificado en AOSP: desde API 21,
-     * TextToSpeech.setLanguage se implementa llamando a setVoice con la voz
-     * que devuelva onGetDefaultVoiceNameFor; el control del mapeo
-     * locale→voz lo tiene el motor, NO el sistema):
-     *  - Con el modo unificado activo (por defecto), si el idioma pedido
-     *    coincide con el de la voz configurada en la app, se devuelve ESA voz
-     *    para cualquier variante del idioma (es-MX, es-PE, es-419, en-US…).
-     *    Así la selección de la app se aplica a Play Books, Neo Reader y al
-     *    sistema entero para su idioma. Resuelve también es-419 (no hay voz
-     *    Edge para ese locale; cae limpio en la voz configurada).
-     *  - Con el modo unificado apagado, se restaura la prioridad por país de
-     *    la v18 (cada variante con su voz regional) vía voiceForLanguage.
-     *  - Para OTROS idiomas (distintos del configurado), siempre la voz del
-     *    catálogo (con prioridad de país si existe).
+     * Unificado ON: la voz de la app en todas partes (Neo, Books, cualquier
+     * idioma). Unificado OFF: el país de Ajustes gana (es-ES ≠ es-MX).
      */
     private fun resolveDefaultVoiceFor(
         lang: String,
         country: String,
         snap: SettingsStore.Snapshot
     ): String? {
-        val requestedLang = normLang(lang)
-        if (requestedLang.isEmpty()) return null
-        val configuredName = snap.voice
-        val configuredLang = normLang(configuredName.substringBefore("-"))
-
-        if (snap.unifiedVoiceMode) {
-            // La voz de la app manda para su idioma.
-            if (configuredLang == requestedLang) return validatedVoice(configuredName)
-            // Libro en español pero la voz configurada es de OTRO idioma: usar
-            // la última voz de español elegida en la app (reconocible, p. ej.
-            // la mexicana), no una variante arbitraria del catálogo que suene
-            // a un español que el usuario no reconoce (era la queja reportada).
-            if (requestedLang == "spa") {
-                return validatedVoice(
-                    snap.lastSpanishVoice.ifBlank { EdgeProtocolConstants.DEFAULT_VOICE }
-                )
-            }
-        }
-        return voiceForLanguage(lang, country)
+        if (normLang(lang).isEmpty()) return null
+        val catalogVoices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
+        return VoiceResolver.resolve(
+            explicitVoiceName = null,
+            requestLang = lang,
+            requestCountry = country,
+            loadedLang = "",
+            loadedCountry = "",
+            configuredVoice = snap.voice,
+            unified = snap.unifiedVoiceMode,
+            catalog = catalogVoices
+        )
     }
 
     /**
@@ -431,44 +352,19 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         )
     }
 
-    /**
-     * Voz a usar en la síntesis:
-     *  1. Voz explícita del cliente ([SynthesisRequest.getVoiceName]).
-     *  2. Idioma POR PETICIÓN (request.language/country): es la fuente más
-     *     fiable — un libro en inglés pide "en" aunque la sesión haya
-     *     cargado español antes. Para español se respeta la voz configurada;
-     *     para OTRO idioma, la voz expuesta de ese idioma.
-     *  3. Idioma cargado en la sesión (onLoadLanguage).
-     *  4. Voz predeterminada configurada (Dalia).
-     */
     private fun resolveVoice(request: SynthesisRequest, snap: SettingsStore.Snapshot): String {
-        // 1) Voz explícita del cliente (cualquier voz del catálogo). Tiene la
-        //    máxima prioridad: si el usuario eligió una voz concreta en
-        //    Ajustes (o la app llamó setVoice), ese voiceName llega aquí y
-        //    gana. Se valida contra el catálogo: si Microsoft la retiró, se
-        //    usa un respaldo del mismo idioma en lugar de enviar un nombre
-        //    inexistente a Edge.
-        val name = request.voiceName?.trim().orEmpty()
-        if (name.isNotEmpty()) return validatedVoice(name)
-
-        // 2) Idioma por petición (request.language/country): es la fuente más
-        //    fiable. Delega en resolveDefaultVoiceFor para que la resolución
-        //    sea idéntica a la que promete onGetDefaultVoiceNameFor (modo
-        //    unificado: la voz de la app para su idioma; si no, catálogo).
-        val lang = normLang(request.language.orEmpty())
-        if (lang.isNotEmpty()) {
-            resolveDefaultVoiceFor(lang, request.country.orEmpty(), snap)?.let { return it }
-        }
-
-        // 3) Idioma cargado en la sesión (onLoadLanguage).
+        val catalogVoices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
         val loaded = currentLanguage
-        val l3 = normLang(loaded.getOrElse(0) { "" })
-        if (l3.isNotEmpty()) {
-            resolveDefaultVoiceFor(l3, loaded.getOrElse(1) { "" }, snap)?.let { return it }
-        }
-
-        // 4) Voz predeterminada configurada.
-        return validatedVoice(snap.voice)
+        return VoiceResolver.resolve(
+            explicitVoiceName = request.voiceName,
+            requestLang = request.language.orEmpty(),
+            requestCountry = request.country.orEmpty(),
+            loadedLang = loaded.getOrElse(0) { "" },
+            loadedCountry = loaded.getOrElse(1) { "" },
+            configuredVoice = snap.voice,
+            unified = snap.unifiedVoiceMode,
+            catalog = catalogVoices
+        )
     }
 
     // ── Velocidad y tono (ajustes de la app + sliders de Android) ────────────
@@ -589,6 +485,9 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
 
         val voice = resolveVoice(request, snap)
+        AppLog.d(TAG) {
+            "voz resuelta=$voice unificado=${snap.unifiedVoiceMode} pedida=${request.voiceName ?: ""}"
+        }
         val rate = SsmlBuilder.signedPercent(effectiveRatePercent(snap, request))
         val pitch = SsmlBuilder.signedHertz(effectivePitchHz(snap, request))
         val started = AtomicBoolean(false)
