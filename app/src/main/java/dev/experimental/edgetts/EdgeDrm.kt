@@ -171,6 +171,15 @@ object SharedProtocol {
     }
 
     @Volatile
+    var lastSampleIso2: String = ""
+        private set
+
+    fun noteSampleLocale(lang: String, country: String = "") {
+        val iso2 = SampleTexts.iso2Language(lang.ifBlank { country })
+        if (iso2.isNotEmpty()) lastSampleIso2 = iso2
+    }
+
+    @Volatile
     private var tts: EdgeProtocolClient? = null
 
     @Volatile
