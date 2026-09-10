@@ -14,8 +14,8 @@ class VoiceCatalogRepository(
     private val client: OkHttpClient,
     cacheDir: File,
     private val drm: EdgeDrm = SharedProtocol.drm,
-    private val snapshotProvider: () -> SettingsStore.Snapshot? = { null },
-    private val voicesListUrl: String = EdgeProtocolConstants.VOICES_LIST_URL
+    private val voicesListUrl: String = EdgeProtocolConstants.VOICES_LIST_URL,
+    private val snapshotProvider: () -> SettingsStore.Snapshot? = { null }
 ) {
 
     data class CatalogResult(

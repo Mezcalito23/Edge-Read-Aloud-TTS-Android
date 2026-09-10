@@ -604,11 +604,17 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
 
         val snap = settings?.snapshot()
-            ?: return guard.error(callback, "No se pudo leer la configuración local.")
+        if (snap == null) {
+            guard.error(callback, "No se pudo leer la configuración local.")
+            return
+        }
 
         val segments = runCatching {
             TextSegmenter.segment(text) { stopRequested }
-        }.getOrElse { return guard.error(callback, "No se pudo segmentar el texto.") }
+        }.getOrElse {
+            guard.error(callback, "No se pudo segmentar el texto.")
+            return
+        }
 
         if (segments.isEmpty()) {
             runCatching {
