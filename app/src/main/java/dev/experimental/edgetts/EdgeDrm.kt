@@ -54,6 +54,8 @@ class EdgeDrm(private val state: ProtocolState) {
             "&Sec-MS-GEC-Version=" + secMsGecVersion
     }
 
+    fun cookieHeader(muid: String): String = "muid=$muid;"
+
     fun handshakeHeaders(userAgent: String, origin: String, muid: String): Map<String, String> =
         linkedMapOf(
             "User-Agent" to userAgent,
@@ -62,7 +64,7 @@ class EdgeDrm(private val state: ProtocolState) {
             "Cache-Control" to "no-cache",
             "Accept-Encoding" to "gzip, deflate, br, zstd",
             "Accept-Language" to "en-US,en;q=0.9",
-            "Cookie" to "muid=$muid;"
+            "Cookie" to cookieHeader(muid)
         )
 
     fun jsTimestamp(withTrailingZ: Boolean = false): String {
