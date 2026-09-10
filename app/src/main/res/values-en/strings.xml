@@ -3,6 +3,9 @@
      with the in-app selector (works on every Android version) or, on
      Android 13+, via Settings → Apps → Edge Read Aloud TTS → Language. -->
 <resources>
+    <string name="app_name">Edge Read Aloud TTS</string>
+    <string name="tts_engine_label">Edge Read Aloud TTS</string>
+
     <string name="subtitle">Experimental Android TTS engine · initial voice es-MX-DaliaNeural</string>
 
     <string name="disclaimer_title">Important notice</string>
@@ -48,7 +51,7 @@
 
     <!-- Cache -->
     <string name="cache_switch">Store synthesized audio on this device</string>
-    <string name="cache_note">Key SHA-256(text+voice+locale+rate+pitch+version). Max 100 MB; oldest files are evicted automatically.</string>
+    <string name="cache_note">Key SHA-256(text+voice+locale+rate+pitch+format+version). Max 100 MB; oldest files are evicted automatically.</string>
     <string name="cache_used_fmt">Used: %1$s of %2$s</string>
     <string name="cache_freed_fmt">Cache cleared (%1$s freed).</string>
 
@@ -100,4 +103,27 @@
     <string name="origin_dialog_hint">The handshake may require a specific Origin. Try, in order: chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold (immersive reader, verified) and https://www.bing.com. It is saved and used by the next synthesis.</string>
     <string name="origin_updated">Origin updated. The next synthesis will use it.</string>
     <string name="origin_restored">Origin restored to the verified value.</string>
+
+    <string name="error_cancelled">Synthesis cancelled by the user or by a new request.</string>
+    <string name="error_undecodable">Undecodable audio: %1$s.</string>
+    <string name="error_format_unknown">unrecognized format</string>
+    <string name="error_no_audio">The server sent no audio: it may have rejected the format or SSML.</string>
+    <string name="error_timeout">Timed out: slow network or server unavailable.</string>
+    <string name="error_eof">The connection closed before the audio completed (EOF).</string>
+    <string name="error_io">Network failure or the server closed the connection: %1$s</string>
+    <string name="error_no_detail">no detail</string>
+    <string name="error_unexpected">Unexpected synthesis error: %1$s</string>
+    <string name="error_http_400">HTTP 400: invalid SSML or format; the provider rejected the request.</string>
+    <string name="error_http_401">HTTP 401: invalid context or authentication; the protocol may have changed.</string>
+    <string name="error_http_403">HTTP 403: access denied (context was already renewed once). The unofficial protocol may have changed: try another User-Agent and check the device clock.</string>
+    <string name="error_http_404">HTTP 404: the endpoint no longer exists; the unofficial protocol changed.</string>
+    <string name="error_http_429">HTTP 429: request limit reached. Reduce synthesis frequency.</string>
+    <string name="error_http_5xx">HTTP %1$d: server failure. Try later.</string>
+    <string name="error_http_other">HTTP %1$d: unexpected response. %2$s</string>
+    <string name="error_settings_unreadable">Could not read local settings.</string>
+    <string name="error_segment_failed">Could not segment the text.</string>
+    <string name="error_audio_start">Could not start the audio channel.</string>
+    <string name="error_audio_deliver">Could not deliver audio to the system.</string>
+    <string name="error_http_client">HTTP client not initialized.</string>
+    <string name="error_empty_audio">The provider returned no audio (empty response).</string>
 </resources>
