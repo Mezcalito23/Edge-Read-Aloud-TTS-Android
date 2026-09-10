@@ -45,13 +45,14 @@ class GetSampleText : Activity() {
      */
     private fun requestedLanguage(): String? {
         runCatching {
-            // Literal en vez de TextToSpeech.Engine.EXTRA_CHECK_VOICE_DATA_FOR
-            // (constante deprecada en los SDK recientes; el valor es estable).
             intent.getStringArrayListExtra("android.speech.tts.engine.extra.CHECK_VOICE_DATA_FOR")
                 ?.firstOrNull { it.isNotBlank() }
                 ?.let { return it }
         }
-        return intent.getStringExtra(EXTRA_LANGUAGE)?.takeIf { it.isNotBlank() }
+        for (key in EXTRA_LANGUAGE_KEYS) {
+            intent.getStringExtra(key)?.takeIf { it.isNotBlank() }?.let { return it }
+        }
+        return null
     }
 
     /**
@@ -75,7 +76,11 @@ class GetSampleText : Activity() {
 
     companion object {
         // Ajustes pasa el idioma actual en este extra (sin constante pública).
-        private const val EXTRA_LANGUAGE = "language"
+        private val EXTRA_LANGUAGE_KEYS = arrayOf(
+            "language",
+            "locale",
+            "android.speech.tts.extra.SAMPLE_TEXT_LANGUAGE"
+        )
 
         /** Muestras genéricas por idioma (sin mencionar voces concretas). */
         private val SAMPLES: Map<String, String> = mapOf(
