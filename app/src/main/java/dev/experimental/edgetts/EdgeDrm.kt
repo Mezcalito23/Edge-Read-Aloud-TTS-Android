@@ -169,4 +169,29 @@ object SharedProtocol {
             .pingInterval(EdgeProtocolConstants.PING_INTERVAL_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
             .build()
     }
+
+    @Volatile
+    private var tts: EdgeProtocolClient? = null
+
+    @Volatile
+    private var ttsFp: EdgeProtocolClient.ConnectionFingerprint? = null
+
+    /**
+     * Un cliente WS por proceso, no por instancia del servicio TTS.
+     * Android destruye y recrea [EdgeReadAloudTtsService] al cambiar de voz
+     * (mismo PID); si el socket vive aquí, el siguiente speak es persist hit.
+     */
+    @Synchronized
+    fun ttsClient(
+        fp: EdgeProtocolClient.ConnectionFingerprint,
+        factory: () -> EdgeProtocolClient
+    ): EdgeProtocolClient {
+        val cur = tts
+        if (cur != null && ttsFp == fp) return cur
+        cur?.shutdown()
+        val created = factory()
+        tts = created
+        ttsFp = fp
+        return created
+    }
 }
