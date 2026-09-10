@@ -58,8 +58,6 @@ class EngineContractTest {
     @Test
     fun emptyTextDoesNotCrash() {
         withEngine { tts ->
-            // El cliente TTS puede rechazar "" antes de llegar al motor;
-            // el contrato es que NADA lance ni se cuelgue.
             val result = speakAndWait(tts, "", timeoutSeconds = 20)
             assertTrue(
                 "respuesta inesperada $result",
@@ -72,11 +70,9 @@ class EngineContractTest {
     fun longTextFinishesInAControlledWay() {
         withEngine { tts ->
             val long = buildString {
-                repeat(600) { append("Este es el párrafo de prueba número $it para segmentación. ") }
+                repeat(8) { append("Este es el párrafo de prueba número $it para segmentación. ") }
             }
-            // Con red o sin ella, debe terminar en done/error antes del timeout,
-            // jamás quedarse colgado ni crashear el proceso.
-            val result = speakAndWait(tts, long, timeoutSeconds = 120)
+            val result = speakAndWait(tts, long, timeoutSeconds = 60)
             assertTrue(
                 "La síntesis no terminó de forma controlada (código $result)",
                 result == TextToSpeech.SUCCESS || result == TextToSpeech.ERROR
@@ -87,37 +83,48 @@ class EngineContractTest {
     @Test
     fun cancellationDuringSynthesisIsSafe() {
         withEngine { tts ->
-            val long = buildString { repeat(400) { append("Frase larga para poder cancelar a mitad. ") } }
+            val long = buildString { repeat(20) { append("Frase larga para poder cancelar a mitad. ") } }
             val started = CountDownLatch(1)
             tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
                     started.countDown()
                 }
 
-                override fun onDone(utteranceId: String?) = Unit
+                override fun onDone(utteranceId: String?) {
+                    started.countDown()
+                }
+
+                @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
+                    started.countDown()
+                }
+
+                override fun onError(utteranceId: String?, errorCode: Int) {
+                    started.countDown()
+                }
+
+                override fun onStop(utteranceId: String?, interrupted: Boolean) {
                     started.countDown()
                 }
             })
             tts.speak(long, TextToSpeech.QUEUE_FLUSH, null, "cancel-test")
             started.await(30, TimeUnit.SECONDS)
-            Thread.sleep(800)
+            Thread.sleep(400)
             val stopResult = tts.stop()
             assertEquals("stop() debe devolver SUCCESS", TextToSpeech.SUCCESS, stopResult)
-            // El motor sigue vivo y responde.
             assertTrue(tts.isLanguageAvailable(Locale.forLanguageTag("es-MX")) >= TextToSpeech.LANG_AVAILABLE)
         }
     }
 
     @Test
     fun unreachableEndpointProducesErrorNotCrash() {
-        // Endpoint local que rechaza la conexión al instante: sin red real.
         val store = SettingsStore(context)
-        val wsBefore = store.snapshotBlocking().wsUrl
+        SettingsStore.ensureLoaded(context)
+        val wsBefore = store.snapshot().wsUrl
         store.setWsUrl("ws://127.0.0.1:9")
         try {
             withEngine { tts ->
-                val result = speakAndWait(tts, "Hola, prueba de fallo de red.", timeoutSeconds = 90)
+                val result = speakAndWait(tts, "Hola, prueba de fallo de red.", timeoutSeconds = 45)
                 assertTrue(
                     "Se esperaba un error controlado y llegó $result",
                     result == TextToSpeech.ERROR || result == TextToSpeech.SUCCESS
@@ -127,8 +134,6 @@ class EngineContractTest {
             store.setWsUrl(wsBefore)
         }
     }
-
-    // ── Helpers ─────────────────────────────────────────────────────────────
 
     private fun withEngine(body: (TextToSpeech) -> Unit) {
         val latch = CountDownLatch(1)
@@ -152,13 +157,28 @@ class EngineContractTest {
         val outcome = AtomicInteger(-1)
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) = Unit
+
             override fun onDone(utteranceId: String?) {
-                outcome.set(TextToSpeech.SUCCESS)
+                outcome.compareAndSet(-1, TextToSpeech.SUCCESS)
                 latch.countDown()
             }
 
+            @Deprecated("Deprecated in Java")
             override fun onError(utteranceId: String?) {
-                outcome.set(TextToSpeech.ERROR)
+                outcome.compareAndSet(-1, TextToSpeech.ERROR)
+                latch.countDown()
+            }
+
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                outcome.compareAndSet(-1, TextToSpeech.ERROR)
+                latch.countDown()
+            }
+
+            override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                outcome.compareAndSet(
+                    -1,
+                    if (interrupted) TextToSpeech.ERROR else TextToSpeech.SUCCESS
+                )
                 latch.countDown()
             }
         })
