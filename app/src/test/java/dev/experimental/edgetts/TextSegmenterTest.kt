@@ -83,4 +83,17 @@ class TextSegmenterTest {
         assertTrue("la cancelación no surtió efecto", segments.size < 100)
         assertTrue(segments.isNotEmpty())
     }
+
+    @Test
+    fun operationalLimitIsSmallerThanProtocolCap() {
+        val text = List(400) { "palabra" }.joinToString(" ")
+        val operational = TextSegmenter.segment(
+            text, { false }, TextSegmenter.OPERATIONAL_SEGMENT_CHARS
+        )
+        operational.forEach { s ->
+            assertTrue(s.length <= TextSegmenter.OPERATIONAL_SEGMENT_CHARS)
+        }
+        assertTrue(operational.size > 1)
+        assertTrue(TextSegmenter.OPERATIONAL_SEGMENT_CHARS < TextSegmenter.MAX_SEGMENT_CHARS)
+    }
 }

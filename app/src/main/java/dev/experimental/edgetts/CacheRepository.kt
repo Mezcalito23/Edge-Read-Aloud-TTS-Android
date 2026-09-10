@@ -4,26 +4,27 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * Caché opcional de audio PCM en cacheDir.
+ * Caché opcional de audio **MP3** (no PCM) en cacheDir.
  *
- * Clave: SHA-256(texto + voz + locale + rate + pitch + versión de protocolo).
- * Nunca entran en la clave (ni en logs) tokens, claves de API ni el texto en
- * claro: el archivo se llama únicamente con el hash.
+ * Clave: SHA-256 de texto sanitizado, voz, locale, rate, pitch, formato y
+ * versión de protocolo, serializados con separador U+001F. El nombre de
+ * archivo es solo el hash: nunca texto, tokens ni URLs.
  *
- * Escritura atómica: se valida el PCM, se escribe `$key.pcm.tmp` y solo
- * entonces se renombra al nombre definitivo. Un fallo deja el archivo
- * anterior intacto y borra el temporal.
- *
- * Límite: 100 MB con eliminación de los archivos más antiguos. Si un archivo
- * está corrupto (vacío o con longitud impar, imposible en PCM 16-bit) se
- * borra y se vuelve a sintetizar.
+ * Escritura atómica: `$key.mp3.tmp` → rename. Un MP3 vacío o un fallo de
+ * escritura no reemplazan una entrada válida. Los `.pcm` de fases
+ * anteriores se eliminan al construir el repositorio.
  */
 class CacheRepository(
     rootDir: File,
     private val maxBytes: Long = MAX_BYTES
 ) {
 
-    private val dir = File(rootDir, "edge_tts_pcm").also { it.mkdirs() }
+    private val dir = File(rootDir, DIR_MP3).also { it.mkdirs() }
+
+    init {
+        val legacy = File(rootDir, DIR_PCM)
+        if (legacy.exists()) runCatching { legacy.deleteRecursively() }
+    }
 
     fun key(
         text: String,
@@ -31,17 +32,18 @@ class CacheRepository(
         locale: String,
         rate: String,
         pitch: String,
+        format: String,
         protocolVersion: String
     ): String = sha256Hex(
-        listOf(text, voice, locale, rate, pitch, protocolVersion).joinToString("\n")
+        listOf(text, voice, locale, rate, pitch, format, protocolVersion)
+            .joinToString("\u001F")
     )
 
-    /** PCM cacheado o null (ausente o corrupto → se elimina y re-sintetiza). */
-    fun read(key: String): ByteArray? {
+    fun readMp3(key: String): ByteArray? {
         val file = targetFile(key)
         if (!file.exists()) return null
         val bytes = runCatching { file.readBytes() }.getOrNull()
-        if (!isValidPcm(bytes)) {
+        if (!isValidMp3(bytes)) {
             runCatching { file.delete() }
             return null
         }
@@ -50,19 +52,19 @@ class CacheRepository(
     }
 
     /**
-     * @return true si el PCM quedó publicado bajo [key]; false si se rechazó
-     * o el replace atómico falló (el archivo previo, si existía, se conserva).
+     * @return true si el MP3 quedó publicado; false si se rechazó o el
+     * replace atómico falló (el archivo previo, si existía, se conserva).
      */
-    fun write(key: String, pcm: ByteArray): Boolean {
-        if (!isValidPcm(pcm)) return false
+    fun writeMp3(key: String, mp3: ByteArray): Boolean {
+        if (!isValidMp3(mp3)) return false
         val target = targetFile(key)
-        val tmp = File(dir, "$key.pcm.tmp")
+        val tmp = File(dir, "$key.mp3.tmp")
         return try {
-            enforceLimit(pcm.size.toLong(), keep = target)
-            tmp.writeBytes(pcm)
+            enforceLimit(mp3.size.toLong(), keep = target)
+            tmp.outputStream().use { it.write(mp3); it.flush() }
             val written = tmp.readBytes()
-            if (!isValidPcm(written) || written.size != pcm.size) {
-                throw IllegalStateException("PCM temporal inválido")
+            if (!isValidMp3(written) || written.size != mp3.size) {
+                throw IllegalStateException("MP3 temporal inválido")
             }
             publishAtomic(tmp, target)
             true
@@ -72,7 +74,11 @@ class CacheRepository(
         }
     }
 
-    /** @return bytes liberados. */
+    fun remove(key: String) {
+        runCatching { targetFile(key).delete() }
+        runCatching { File(dir, "$key.mp3.tmp").delete() }
+    }
+
     fun clear(): Long {
         val freed = sizeBytes()
         dir.listFiles()?.forEach { runCatching { it.delete() } }
@@ -80,9 +86,9 @@ class CacheRepository(
     }
 
     fun sizeBytes(): Long =
-        dir.listFiles { f -> f.extension == "pcm" }?.sumOf { it.length() } ?: 0L
+        dir.listFiles { f -> f.extension == "mp3" }?.sumOf { it.length() } ?: 0L
 
-    private fun targetFile(key: String) = File(dir, "$key.pcm")
+    private fun targetFile(key: String) = File(dir, "$key.mp3")
 
     private fun publishAtomic(tmp: File, target: File) {
         if (tmp.renameTo(target)) return
@@ -99,7 +105,7 @@ class CacheRepository(
     private fun enforceLimit(incoming: Long, keep: File) {
         var total = sizeBytes()
         if (total + incoming <= maxBytes) return
-        val oldestFirst = dir.listFiles { f -> f.extension == "pcm" }
+        val oldestFirst = dir.listFiles { f -> f.extension == "mp3" }
             ?.filter { it.absolutePath != keep.absolutePath }
             ?.sortedBy { it.lastModified() }
             ?: return
@@ -114,9 +120,11 @@ class CacheRepository(
 
     companion object {
         const val MAX_BYTES: Long = 100L * 1024L * 1024L
+        const val DIR_MP3: String = "edge_tts_mp3"
+        const val DIR_PCM: String = "edge_tts_pcm"
 
-        fun isValidPcm(bytes: ByteArray?): Boolean =
-            bytes != null && bytes.isNotEmpty() && bytes.size % 2 == 0
+        fun isValidMp3(bytes: ByteArray?): Boolean =
+            bytes != null && bytes.isNotEmpty()
 
         fun sha256Hex(input: String): String {
             val digest = MessageDigest.getInstance("SHA-256")
