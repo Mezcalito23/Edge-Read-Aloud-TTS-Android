@@ -86,7 +86,7 @@ open class CheckVoiceData : Activity() {
     private fun canonicalLocales(): List<String> {
         val set = LinkedHashSet<String>()
         runCatching {
-            val file = File(cacheDir, "voice_catalog.json")
+            val file = File(cacheDir, VoiceCatalogRepository.CATALOG_FILENAME)
             if (file.exists()) {
                 val array = org.json.JSONArray(file.readText())
                 for (i in 0 until array.length()) {
@@ -113,28 +113,15 @@ open class CheckVoiceData : Activity() {
     private fun matches(requestedRaw: String, locales: List<String>): Boolean {
         val req = requestedRaw.trim().lowercase(Locale.ROOT).replace('_', '-')
         if (req.isEmpty()) return false
-        val reqLang = iso3ToIso2(req.substringBefore('-'))
+        val reqLang = LocaleCodes.iso3ToIso2LangOrSelf(req.substringBefore('-'))
         return locales.any { entry ->
             val e = entry.lowercase(Locale.ROOT)
             e == req ||
                 e.substringBefore('-') == req ||
-                iso3ToIso2(e.substringBefore('-')) == reqLang
+                LocaleCodes.iso3ToIso2LangOrSelf(e.substringBefore('-')) == reqLang
         }
     }
 
-    private fun iso3ToIso2(code: String): String {
-        if (code.length != 3) return code
-        for (iso2 in Locale.getISOLanguages()) {
-            runCatching {
-                // forLanguageTag en vez del constructor Locale(String),
-                // deprecado en los SDK recientes.
-                if (Locale.forLanguageTag(iso2).isO3Language.equals(code, ignoreCase = true)) return iso2
-            }
-        }
-        return code
-    }
-
-    /** Lectura tolerante: los llamadores usan ArrayList, String[] o String. */
     private fun readRequestedLocales(): List<String> {
         // Literal en vez de TextToSpeech.Engine.EXTRA_CHECK_VOICE_DATA_FOR,
         // deprecado en los SDK recientes (el valor es estable).

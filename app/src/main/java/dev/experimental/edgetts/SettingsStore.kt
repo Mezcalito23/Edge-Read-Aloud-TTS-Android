@@ -13,18 +13,19 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Preferencias del motor en DataStore Preferences.
- *
- * El servicio TTS vive en el MISMO proceso que la actividad (paquete único),
- * así que lee el snapshot de forma síncrona y bloqueante (runBlocking) sin
- * riesgo de deadlock: onSynthesizeText nunca corre en el hilo principal.
- *
- * Por defecto NO se guarda ningún texto leído; la caché (opt-in) almacena
- * solo audio, indexado por hash SHA-256.
+ * Preferencias del motor. El snapshot en memoria es la fuente para Binder/UI;
+ * DataStore se lee y escribe en un hilo de infraestructura.
  */
 class SettingsStore(context: Context) {
 
@@ -44,97 +45,123 @@ class SettingsStore(context: Context) {
         val lastError: String,
         val handshakeDebug: String,
         val catalogUpdatedAt: Long
-    )
-
-    private val store: DataStore<Preferences> = Holder.get(context)
-
-    fun snapshotBlocking(): Snapshot =
-        runBlocking { store.data.first() }.toSnapshot()
-
-    fun setVoice(voice: String) = update { it[K_VOICE] = voice }
-
-    fun setRate(percent: Int) = update { it[K_RATE] = percent.coerceIn(-50, 50) }
-
-    fun setPitch(hz: Int) = update { it[K_PITCH] = hz.coerceIn(-50, 50) }
-
-    fun setCacheEnabled(enabled: Boolean) = update { it[K_CACHE] = enabled }
-
-    /**
-     * User-Agent configurable: si Microsoft rota la build de Edge que
-     * acepta, el usuario lo edita desde la app sin recompilar la APK.
-     */
-    fun setUserAgent(ua: String) = update { it[K_USER_AGENT] = ua.trim() }
-
-    fun resetUserAgent() = update { it.remove(K_USER_AGENT) }
-
-    /**
-     * Origin configurable: el handshake puede exigir el del lector inmersivo
-     * (chrome-extension://…) u otro. Editable desde la app sin recompilar.
-     */
-    fun setOrigin(o: String) = update { it[K_ORIGIN] = o.trim() }
-
-    fun resetOrigin() = update { it.remove(K_ORIGIN) }
-
-    /** Idioma de la UI: "" = sistema, "es", "en". */
-    fun setUiLanguage(code: String) = update {
-        if (code.isBlank()) it.remove(K_UI_LANG) else it[K_UI_LANG] = code
-    }
-
-    /**
-     * Modo de voz unificada (Modelo 1): la voz elegida en la app es la fuente
-     * de verdad para todo su idioma. Cuando está activo, el sistema (Play
-     * Books, Neo Reader, Ajustes) usa la voz de la app para cualquier variante
-     * de ese idioma; cuando se apaga, se restaura la prioridad por país de la
-     * v18 (cada variante de español con su voz regional). Por defecto ON.
-     */
-    fun setUnifiedVoiceMode(enabled: Boolean) = update { it[K_UNIFIED_VOICE] = enabled }
-
-    /**
-     * Última voz de español elegida en la app. En modo unificado, cuando un
-     * libro está en español pero la voz configurada es de OTRO idioma, se usa
-     * esta voz (una de español reconocible, p. ej. la mexicana) en lugar de
-     * una variante arbitraria del catálogo (que podía sonar a un español que
-     * el usuario no reconoce).
-     */
-    fun setLastSpanishVoice(voice: String) = update { it[K_LAST_ES_VOICE] = voice }
-
-    /** Diagnóstico del último handshake (solo metadatos; lo escribe el cliente). */
-    fun setHandshakeDebug(d: String) = update { it[K_HS_DEBUG] = d.take(500) }
-
-    fun setLastError(message: String) = update { it[K_LAST_ERROR] = message.take(500) }
-
-    fun clearLastError() = update { it.remove(K_LAST_ERROR) }
-
-    fun setCatalogUpdatedAt(millis: Long) = update { it[K_CATALOG_TS] = millis }
-
-    /** Restablece TODO a los valores iniciales de la especificación. */
-    fun reset() = update { it.clear() }
-
-    private fun update(block: (MutablePreferences) -> Unit) {
-        runBlocking {
-            store.edit { prefs -> block(prefs) }
+    ) {
+        companion object {
+            fun defaults(): Snapshot = Snapshot(
+                locale = EdgeProtocolConstants.DEFAULT_LOCALE,
+                voice = EdgeProtocolConstants.DEFAULT_VOICE,
+                ratePercent = 0,
+                pitchHz = 0,
+                cacheEnabled = true,
+                voicesUrl = EdgeProtocolConstants.VOICES_LIST_URL,
+                wsUrl = EdgeProtocolConstants.WS_BASE_URL,
+                userAgent = EdgeProtocolConstants.DEFAULT_USER_AGENT,
+                origin = EdgeProtocolConstants.DEFAULT_ORIGIN,
+                uiLanguage = "",
+                unifiedVoiceMode = true,
+                lastSpanishVoice = EdgeProtocolConstants.DEFAULT_VOICE,
+                lastError = "",
+                handshakeDebug = "",
+                catalogUpdatedAt = 0L
+            )
         }
     }
 
-    private fun Preferences.toSnapshot(): Snapshot = Snapshot(
-        locale = this[K_LOCALE] ?: EdgeProtocolConstants.DEFAULT_LOCALE,
-        voice = this[K_VOICE] ?: EdgeProtocolConstants.DEFAULT_VOICE,
-        ratePercent = this[K_RATE] ?: 0,
-        pitchHz = this[K_PITCH] ?: 0,
-        cacheEnabled = this[K_CACHE] ?: true,
-        voicesUrl = this[K_VOICES_URL] ?: EdgeProtocolConstants.VOICES_LIST_URL,
-        wsUrl = this[K_WS_URL] ?: EdgeProtocolConstants.WS_BASE_URL,
-        userAgent = this[K_USER_AGENT] ?: EdgeProtocolConstants.DEFAULT_USER_AGENT,
-        origin = this[K_ORIGIN] ?: EdgeProtocolConstants.DEFAULT_ORIGIN,
-        uiLanguage = this[K_UI_LANG].orEmpty(),
-        unifiedVoiceMode = this[K_UNIFIED_VOICE] ?: true,
-        lastSpanishVoice = this[K_LAST_ES_VOICE] ?: EdgeProtocolConstants.DEFAULT_VOICE,
-        lastError = this[K_LAST_ERROR].orEmpty(),
-        handshakeDebug = this[K_HS_DEBUG].orEmpty(),
-        catalogUpdatedAt = this[K_CATALOG_TS] ?: 0L
-    )
+    private val store: DataStore<Preferences> = Holder.get(context)
 
-    private companion object {
+    fun snapshot(): Snapshot = Holder.snapshot
+
+    fun snapshotBlocking(): Snapshot {
+        val disk = runBlocking { store.data.first() }.let { snapshotOf(it) }
+        if (Holder.pendingWrites.get() == 0) Holder.snapshot = disk
+        return if (Holder.pendingWrites.get() == 0) disk else Holder.snapshot
+    }
+
+    fun setVoice(voice: String) = applyAndPersist({ it.copy(voice = voice) }) { it[K_VOICE] = voice }
+
+    fun setRate(percent: Int) {
+        val value = percent.coerceIn(-50, 50)
+        applyAndPersist({ it.copy(ratePercent = value) }) { it[K_RATE] = value }
+    }
+
+    fun setPitch(hz: Int) {
+        val value = hz.coerceIn(-50, 50)
+        applyAndPersist({ it.copy(pitchHz = value) }) { it[K_PITCH] = value }
+    }
+
+    fun setCacheEnabled(enabled: Boolean) =
+        applyAndPersist({ it.copy(cacheEnabled = enabled) }) { it[K_CACHE] = enabled }
+
+    fun setUserAgent(ua: String) {
+        val value = ua.trim()
+        applyAndPersist({ it.copy(userAgent = value) }) { it[K_USER_AGENT] = value }
+    }
+
+    fun resetUserAgent() = applyAndPersist(
+        { it.copy(userAgent = EdgeProtocolConstants.DEFAULT_USER_AGENT) }
+    ) { it.remove(K_USER_AGENT) }
+
+    fun setOrigin(o: String) {
+        val value = o.trim()
+        applyAndPersist({ it.copy(origin = value) }) { it[K_ORIGIN] = value }
+    }
+
+    fun resetOrigin() = applyAndPersist(
+        { it.copy(origin = EdgeProtocolConstants.DEFAULT_ORIGIN) }
+    ) { it.remove(K_ORIGIN) }
+
+    fun setUiLanguage(code: String) = applyAndPersist({ it.copy(uiLanguage = code) }) {
+        if (code.isBlank()) it.remove(K_UI_LANG) else it[K_UI_LANG] = code
+    }
+
+    fun setUnifiedVoiceMode(enabled: Boolean) =
+        applyAndPersist({ it.copy(unifiedVoiceMode = enabled) }) { it[K_UNIFIED_VOICE] = enabled }
+
+    fun setLastSpanishVoice(voice: String) =
+        applyAndPersist({ it.copy(lastSpanishVoice = voice) }) { it[K_LAST_ES_VOICE] = voice }
+
+    fun setHandshakeDebug(d: String) {
+        val value = d.take(MAX_DIAG_CHARS)
+        applyAndPersist({ it.copy(handshakeDebug = value) }) { it[K_HS_DEBUG] = value }
+    }
+
+    fun setLastError(message: String) {
+        val value = message.take(500)
+        applyAndPersist({ it.copy(lastError = value) }) { it[K_LAST_ERROR] = value }
+    }
+
+    fun clearLastError() = applyAndPersist({ it.copy(lastError = "") }) { it.remove(K_LAST_ERROR) }
+
+    fun setCatalogUpdatedAt(millis: Long) =
+        applyAndPersist({ it.copy(catalogUpdatedAt = millis) }) { it[K_CATALOG_TS] = millis }
+
+    fun setWsUrl(url: String) {
+        val value = url.trim()
+        applyAndPersist({ it.copy(wsUrl = value) }) { it[K_WS_URL] = value }
+    }
+
+    fun reset() = applyAndPersist({ Snapshot.defaults() }) { it.clear() }
+
+    private fun applyAndPersist(
+        local: (Snapshot) -> Snapshot,
+        persist: (MutablePreferences) -> Unit
+    ) {
+        synchronized(Holder.lock) {
+            Holder.snapshot = local(Holder.snapshot)
+        }
+        Holder.pendingWrites.incrementAndGet()
+        Holder.writeExecutor.execute {
+            try {
+                runBlocking { store.edit { prefs -> persist(prefs) } }
+            } finally {
+                Holder.pendingWrites.decrementAndGet()
+            }
+        }
+    }
+
+    companion object {
+        private const val MAX_DIAG_CHARS = 1500
+
         val K_LOCALE = stringPreferencesKey("locale")
         val K_VOICE = stringPreferencesKey("voice")
         val K_RATE = intPreferencesKey("rate_percent")
@@ -150,20 +177,79 @@ class SettingsStore(context: Context) {
         val K_LAST_ERROR = stringPreferencesKey("last_error")
         val K_HS_DEBUG = stringPreferencesKey("handshake_debug")
         val K_CATALOG_TS = longPreferencesKey("catalog_updated_at")
+
+        fun ensureLoaded(context: Context) {
+            Holder.get(context)
+            Holder.awaitInitialized()
+        }
+
+        fun snapshotOf(prefs: Preferences): Snapshot = Snapshot(
+            locale = prefs[K_LOCALE] ?: EdgeProtocolConstants.DEFAULT_LOCALE,
+            voice = prefs[K_VOICE] ?: EdgeProtocolConstants.DEFAULT_VOICE,
+            ratePercent = prefs[K_RATE] ?: 0,
+            pitchHz = prefs[K_PITCH] ?: 0,
+            cacheEnabled = prefs[K_CACHE] ?: true,
+            voicesUrl = prefs[K_VOICES_URL] ?: EdgeProtocolConstants.VOICES_LIST_URL,
+            wsUrl = prefs[K_WS_URL] ?: EdgeProtocolConstants.WS_BASE_URL,
+            userAgent = prefs[K_USER_AGENT] ?: EdgeProtocolConstants.DEFAULT_USER_AGENT,
+            origin = prefs[K_ORIGIN] ?: EdgeProtocolConstants.DEFAULT_ORIGIN,
+            uiLanguage = prefs[K_UI_LANG].orEmpty(),
+            unifiedVoiceMode = prefs[K_UNIFIED_VOICE] ?: true,
+            lastSpanishVoice = prefs[K_LAST_ES_VOICE] ?: EdgeProtocolConstants.DEFAULT_VOICE,
+            lastError = prefs[K_LAST_ERROR].orEmpty(),
+            handshakeDebug = prefs[K_HS_DEBUG].orEmpty(),
+            catalogUpdatedAt = prefs[K_CATALOG_TS] ?: 0L
+        )
     }
 
-    /** DataStore exige una única instancia por archivo; Holder la garantiza. */
     private object Holder {
+        val lock = Any()
+
+        @Volatile
+        var snapshot: Snapshot = Snapshot.defaults()
+
+        val pendingWrites = AtomicInteger(0)
+
+        val writeExecutor = Executors.newSingleThreadExecutor { r ->
+            Thread(r, "edge-tts-settings-io").apply { isDaemon = true }
+        }
+
+        private val initialized = AtomicBoolean(false)
+        private val initLatch = CountDownLatch(1)
+
         @Volatile
         private var instance: DataStore<Preferences>? = null
+
+        private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
         fun get(context: Context): DataStore<Preferences> =
             instance ?: synchronized(this) {
                 instance ?: androidx.datastore.preferences.core.PreferenceDataStoreFactory.create(
-                    scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+                    scope = scope
                 ) {
                     context.applicationContext.preferencesDataStoreFile("edge_tts_settings")
-                }.also { instance = it }
+                }.also { ds ->
+                    instance = ds
+                    scope.launch {
+                        ds.data.collect { prefs ->
+                            if (pendingWrites.get() == 0) {
+                                snapshot = snapshotOf(prefs)
+                            }
+                            if (initialized.compareAndSet(false, true)) initLatch.countDown()
+                        }
+                    }
+                }
             }
+
+        fun awaitInitialized(timeoutMs: Long = 1_000L) {
+            if (initialized.get()) return
+            if (initLatch.await(timeoutMs, TimeUnit.MILLISECONDS)) return
+            val ds = instance ?: return
+            runCatching {
+                val disk = runBlocking { ds.data.first() }.let { snapshotOf(it) }
+                if (pendingWrites.get() == 0) snapshot = disk
+                if (initialized.compareAndSet(false, true)) initLatch.countDown()
+            }
+        }
     }
 }
