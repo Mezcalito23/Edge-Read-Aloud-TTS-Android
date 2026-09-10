@@ -43,12 +43,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     private var active: Cancellable? = null
 
     @Volatile
-    private var protocol: EdgeProtocolClient? = null
-
-    @Volatile
-    private var protocolFp: EdgeProtocolClient.ConnectionFingerprint? = null
-
-    @Volatile
     private var stopRequested = false
 
     private val synthesisLock = Any()
@@ -91,9 +85,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         stopRequested = true
         mp3Decoder.cancel()
         active?.cancel()
-        protocol?.shutdown()
-        protocol = null
-        protocolFp = null
         super.onDestroy()
     }
 
@@ -817,22 +808,17 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             outputFormat = outputFormat,
             token = EdgeProtocolConstants.TRUSTED_CLIENT_TOKEN
         )
-        val existing = protocol
-        if (existing != null && protocolFp == fp) return existing
-        existing?.shutdown()
-        val created = EdgeProtocolClient(
-            client,
-            drm = SharedProtocol.drm,
-            wsBaseUrl = fp.wsUrl,
-            userAgent = fp.userAgent,
-            origin = fp.origin,
-            outputFormat = fp.outputFormat,
-            onDiagnostic = { d -> runCatching { settings?.setHandshakeDebug(d) } }
-        )
-        protocol = created
-        protocolFp = fp
-        return created
-    }
+        return SharedProtocol.ttsClient(fp) {
+            EdgeProtocolClient(
+                client,
+                drm = SharedProtocol.drm,
+                wsBaseUrl = fp.wsUrl,
+                userAgent = fp.userAgent,
+                origin = fp.origin,
+                outputFormat = fp.outputFormat,
+                onDiagnostic = { d -> runCatching { settings?.setHandshakeDebug(d) } }
+            )
+        }
 
     /**
      * Envía el PCM en bloques limitados. La cancelación se detecta en cada
