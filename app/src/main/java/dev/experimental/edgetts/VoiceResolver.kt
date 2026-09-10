@@ -1,15 +1,15 @@
 package dev.experimental.edgetts
 
 /**
- * Quién gana al elegir voz. Sin Android: se cubre con tests JVM.
+ * Quién manda la voz.
  *
- * 1. [explicitVoiceName] (setVoice / Ajustes, voz concreta).
- * 2. Modo unificado: la voz de la app, cualquier idioma o país.
- * 3. Idioma+país de la petición / Ajustes: España suena España, GB suena GB.
- * 4. Idioma de sesión (onLoadLanguage).
- * 5. Voz configurada en la app.
+ * Unificado ON: siempre la voz de la app (Play Books no puede imponer Valentina).
+ * Unificado OFF: Ajustes del sistema (pin), no el idioma del libro.
+ * La app misma (botón Probar) sí puede pedir una voz concreta con OFF.
  */
 object VoiceResolver {
+
+    enum class Caller { OwnApp, SettingsUi, Reader }
 
     fun resolve(
         explicitVoiceName: String?,
@@ -19,22 +19,38 @@ object VoiceResolver {
         loadedCountry: String,
         configuredVoice: String,
         unified: Boolean,
-        catalog: List<EdgeVoice>
+        catalog: List<EdgeVoice>,
+        caller: Caller = Caller.Reader,
+        pinnedLang: String = "",
+        pinnedCountry: String = ""
     ): String {
-        explicitVoiceName?.trim()?.takeIf { it.isNotEmpty() }?.let {
-            return validated(it, configuredVoice, catalog)
-        }
         if (unified) return validated(configuredVoice, configuredVoice, catalog)
 
-        val reqLang = LocaleCodes.normLang(requestLang)
-        if (reqLang.isNotEmpty()) {
-            voiceForLanguage(reqLang, requestCountry, configuredVoice, catalog)?.let {
+        if (caller == Caller.OwnApp) {
+            explicitVoiceName?.trim()?.takeIf { it.isNotEmpty() }?.let {
                 return validated(it, configuredVoice, catalog)
             }
         }
-        val sessLang = LocaleCodes.normLang(loadedLang)
-        if (sessLang.isNotEmpty()) {
-            voiceForLanguage(sessLang, loadedCountry, configuredVoice, catalog)?.let {
+
+        if (caller == Caller.SettingsUi) {
+            explicitVoiceName?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                return validated(it, configuredVoice, catalog)
+            }
+            voiceForLanguage(requestLang, requestCountry, configuredVoice, catalog)?.let {
+                return validated(it, configuredVoice, catalog)
+            }
+        }
+
+        val pinL = pinnedLang.ifBlank { loadedLang }
+        val pinC = if (pinnedLang.isNotBlank()) pinnedCountry else loadedCountry
+        if (LocaleCodes.normLang(pinL).isNotEmpty()) {
+            voiceForLanguage(pinL, pinC, configuredVoice, catalog)?.let {
+                return validated(it, configuredVoice, catalog)
+            }
+        }
+        val reqLang = LocaleCodes.normLang(requestLang)
+        if (reqLang.isNotEmpty()) {
+            voiceForLanguage(reqLang, requestCountry, configuredVoice, catalog)?.let {
                 return validated(it, configuredVoice, catalog)
             }
         }

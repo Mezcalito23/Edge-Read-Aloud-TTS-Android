@@ -71,7 +71,7 @@
     <string name="test_phrase">Hello. This is a test of the Edge Read Aloud engine. The voice you hear is synthesized in the cloud.</string>
     <string name="voice_count_fmt">%1$d voices in catalog · %2$d es-MX</string>
     <string name="unified_voice_switch">The voice chosen here drives the whole system</string>
-    <string name="unified_voice_hint">On: Neo, Play Books and the rest always use the voice above, regardless of book or system language. Off (recommended): Android Settings language and country are honoured — Spain sounds like Spain, British English like British, Urdu like Urdu. Set “Edge Read Aloud TTS” as the preferred engine in Settings → Text-to-speech.</string>
+    <string name="unified_voice_hint">On: Neo, Play Books and the Settings sample always use the voice and language chosen above, even if the book is in another language. Off: Android Settings → Text-to-speech wins (Spain sounds like Spain, British English like British). Book text is not translated; only the voice changes.</string>
     <string name="catalog_updating">Refreshing catalog…</string>
     <string name="catalog_updated_fmt">Catalog updated (%1$d voices).</string>
     <string name="catalog_offline">Catalog unavailable; using local fallback es-MX-DaliaNeural.</string>

@@ -68,7 +68,7 @@
     <string name="test_phrase">Hola. Esta es una prueba del motor Edge Read Aloud. La voz que escuchas se sintetiza en la nube.</string>
     <string name="voice_count_fmt">%1$d voces en catálogo · %2$d es-MX</string>
     <string name="unified_voice_switch">La voz elegida aquí manda en todo el sistema</string>
-    <string name="unified_voice_hint">Activado: Neo, Play Books y el resto usan siempre la voz de arriba, da igual el idioma del libro o de Ajustes. Desactivado (recomendado): se respeta el idioma y el país de Ajustes — español de España suena España, inglés británico suena británico, urdu suena urdu. Elige «Edge Read Aloud TTS» como motor preferido en Ajustes → Texto a voz.</string>
+    <string name="unified_voice_hint">Activado: Neo, Play Books y el ejemplo de Ajustes usan siempre la voz y el idioma de arriba, aunque el libro esté en otro idioma. Desactivado: mandan la voz y el idioma de Ajustes → Texto a voz (España suena España, inglés británico suena británico). El texto largo de un libro no se traduce; solo cambia la voz.</string>
     <string name="catalog_updating">Actualizando catálogo…</string>
     <string name="catalog_updated_fmt">Catálogo actualizado (%1$d voces).</string>
     <string name="catalog_offline">Catálogo no disponible; usando respaldo local es-MX-DaliaNeural.</string>
