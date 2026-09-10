@@ -40,8 +40,7 @@ class TextSegmenterTest {
     fun orderIsKeptAcrossManySentences() {
         val text = (1..60).joinToString(" ") { "Frase número $it." }
         val segments = TextSegmenter.segment(text)
-        val rebuilt = segments.joinToString("")
-        assertEquals(text, rebuilt)
+        assertEquals(text, segments.joinToString(""))
     }
 
     @Test

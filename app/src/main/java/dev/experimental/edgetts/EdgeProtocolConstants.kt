@@ -96,6 +96,7 @@ object EdgeProtocolConstants {
     /** Nunca más de un reintento automático, y solo si no se recibió audio. */
     const val MAX_AUTO_RETRIES: Int = 1
 
+    const val MAX_SEGMENT_CHARS: Int = 4000
     /** Tope protocolario rany2/edge-tts: split_text_by_byte_length(text, 4096). */
     const val MAX_SEGMENT_BYTES: Int = 4096
 
