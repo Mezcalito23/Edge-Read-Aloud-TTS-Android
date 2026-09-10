@@ -60,9 +60,13 @@ class EdgeProtocolClient(
         pitch: String,
         onEncodedAudioChunk: (ByteArray, Int, Int) -> Unit,
         onComplete: () -> Unit,
-        onError: (Throwable) -> Unit
+        onError: (Throwable) -> Unit,
+        onAudioMetadata: (String) -> Unit = {}
     ): PreparedTurn {
-        val session = Session(text, voice, locale, rate, pitch, onEncodedAudioChunk, onComplete, onError)
+        val session = Session(
+            text, voice, locale, rate, pitch,
+            onEncodedAudioChunk, onComplete, onError, onAudioMetadata
+        )
         return PreparedTurn(session)
     }
 
@@ -79,7 +83,8 @@ class EdgeProtocolClient(
         private val pitch: String,
         private val onEncodedAudioChunk: (ByteArray, Int, Int) -> Unit,
         private val onComplete: () -> Unit,
-        private val onError: (Throwable) -> Unit
+        private val onError: (Throwable) -> Unit,
+        private val onAudioMetadata: (String) -> Unit
     ) {
 
         private val requestId = UUID.randomUUID().toString().replace("-", "")
@@ -213,6 +218,11 @@ class EdgeProtocolClient(
                         }
                     }
 
+                    EdgeProtocolConstants.PATH_AUDIO_METADATA -> {
+                        val body = AudioFrameParser.bodyOf(text)
+                        if (body.isNotEmpty()) onAudioMetadata(body)
+                    }
+
                     EdgeProtocolConstants.PATH_RESPONSE -> {
                         val body = AudioFrameParser.bodyOf(text)
                         val status = STATUS_JSON.find(body)?.groupValues?.get(1)?.toIntOrNull()
@@ -243,6 +253,9 @@ class EdgeProtocolClient(
                         receivedAudio.set(true)
                         onEncodedAudioChunk(frame.raw, frame.payloadOffset, frame.payloadLength)
                     }
+                } else if (frame.path == EdgeProtocolConstants.PATH_AUDIO_METADATA) {
+                    val body = String(frame.payload, Charsets.UTF_8)
+                    if (body.isNotEmpty()) onAudioMetadata(body)
                 }
             }
 
@@ -326,8 +339,8 @@ class EdgeProtocolClient(
                                 .put(
                                     "metadataoptions",
                                     JSONObject()
-                                        .put("sentenceBoundaryEnabled", "false")
-                                        .put("wordBoundaryEnabled", "false")
+                                        .put("sentenceBoundaryEnabled", "true")
+                                        .put("wordBoundaryEnabled", "true")
                                 )
                                 .put("outputFormat", outputFormat)
                         )

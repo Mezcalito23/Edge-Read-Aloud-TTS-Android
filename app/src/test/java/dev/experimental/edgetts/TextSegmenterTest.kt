@@ -18,11 +18,22 @@ class TextSegmenterTest {
     }
 
     @Test
-    fun paragraphsSplitOnBlankLineAndRejoin() {
+    fun shortParagraphsStayTogetherUnderTheByteCap() {
         val text = "Primer párrafo.\n\nSegundo párrafo."
         val segments = TextSegmenter.segment(text)
-        assertEquals(2, segments.size)
+        assertEquals(listOf(text), segments)
+    }
+
+    @Test
+    fun longParagraphsSplitOnBlankLineAndRejoin() {
+        val a = "A".repeat(3000)
+        val b = "B".repeat(3000)
+        val text = "$a\n\n$b"
+        val segments = TextSegmenter.segment(text)
+        assertTrue(segments.size >= 2)
         assertEquals(text, segments.joinToString(""))
+        assertTrue(segments[0].contains("A"))
+        assertTrue(segments.last().contains("B"))
     }
 
     @Test
@@ -78,7 +89,7 @@ class TextSegmenterTest {
 
     @Test
     fun operationalLimitIsSmallerThanProtocolCap() {
-        val text = List(400) { "palabra" }.joinToString(" ")
+        val text = List(800) { "palabra" }.joinToString(" ")
         val operational = TextSegmenter.segment(
             text, { false }, TextSegmenter.OPERATIONAL_SEGMENT_BYTES
         )

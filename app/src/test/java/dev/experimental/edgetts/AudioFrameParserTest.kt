@@ -112,6 +112,23 @@ class AudioFrameParserTest {
     }
 
     @Test
+    fun parseTimedRangesMapsWordsAndTicks() {
+        val json = """
+            {"Metadata":[
+              {"Type":"WordBoundary","Data":{"Offset":5000000,"text":{"Text":"Hola","Length":4}}},
+              {"Type":"WordBoundary","Data":{"Offset":9000000,"text":{"Text":"mundo","Length":5}}}
+            ]}
+        """.trimIndent()
+        val ranges = AudioFrameParser.parseTimedRanges(listOf(json), "Hola mundo")
+        assertEquals(2, ranges.size)
+        assertEquals(0, ranges[0].start)
+        assertEquals(4, ranges[0].end)
+        assertEquals(5, ranges[1].start)
+        assertEquals(10, ranges[1].end)
+        assertEquals(120, AudioFrameParser.ticksToFrames(5_000_000L, 24000))
+    }
+
+    @Test
     fun detectFormatPcm() {
         val pcm = byteArrayOf(0x00.toByte(), 0x7F.toByte(), 0x80.toByte(), 0xFF.toByte())
         assertEquals(AudioFrameParser.PayloadFormat.PCM, AudioFrameParser.detectFormat(pcm))

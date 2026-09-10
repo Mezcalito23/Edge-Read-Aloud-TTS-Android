@@ -1,6 +1,7 @@
 package dev.experimental.edgetts
 
 import okio.ByteString
+import org.json.JSONObject
 
 /**
  * Parser de los frames del protocolo WebSocket, aislado del cliente para
@@ -77,6 +78,48 @@ object AudioFrameParser {
 
     fun isAudio(headers: Map<String, String>): Boolean =
         pathOf(headers) == EdgeProtocolConstants.PATH_AUDIO
+
+    data class TimedRange(
+        val offsetTicks: Long,
+        val start: Int,
+        val end: Int
+    )
+
+    /**
+     * Word/SentenceBoundary de audio.metadata. Índices UTF-16 en [segment].
+     * Offset en ticks de 100 ns del audio (rany2/edge-tts).
+     */
+    fun parseTimedRanges(bodies: List<String>, segment: String): List<TimedRange> {
+        if (segment.isEmpty() || bodies.isEmpty()) return emptyList()
+        val out = ArrayList<TimedRange>()
+        var cursor = 0
+        for (body in bodies) {
+            val root = runCatching { JSONObject(body) }.getOrNull() ?: continue
+            val arr = root.optJSONArray("Metadata") ?: continue
+            for (i in 0 until arr.length()) {
+                val item = arr.optJSONObject(i) ?: continue
+                val type = item.optString("Type")
+                if (type != "WordBoundary" && type != "SentenceBoundary") continue
+                val data = item.optJSONObject("Data") ?: continue
+                val ticks = data.optLong("Offset", -1L)
+                if (ticks < 0L) continue
+                val textObj = data.optJSONObject("text") ?: data.optJSONObject("Text")
+                val word = textObj?.optString("Text").orEmpty()
+                if (word.isEmpty()) continue
+                val idx = segment.indexOf(word, cursor)
+                val start = if (idx >= 0) idx else continue
+                val end = (start + word.length).coerceAtMost(segment.length)
+                cursor = end
+                out += TimedRange(ticks, start, end)
+            }
+        }
+        return out
+    }
+
+    fun ticksToFrames(ticks: Long, sampleRateHz: Int): Int {
+        if (ticks <= 0L || sampleRateHz <= 0) return 0
+        return ((ticks * sampleRateHz) / 10_000_000L).toInt().coerceAtLeast(0)
+    }
 
     // ── Frames binarios ─────────────────────────────────────────────────────
 
