@@ -15,10 +15,24 @@ object AudioFrameParser {
 
     data class BinaryFrame(
         val headers: Map<String, String>,
-        val payload: ByteArray
+        val raw: ByteArray,
+        val payloadOffset: Int
     ) {
         val path: String?
             get() = headers[EdgeProtocolConstants.HEADER_PATH]?.trim()
+
+        val payloadLength: Int
+            get() = (raw.size - payloadOffset).coerceAtLeast(0)
+
+        val payload: ByteArray
+            get() = when {
+                payloadLength <= 0 -> ByteArray(0)
+                payloadOffset == 0 && payloadLength == raw.size -> raw
+                else -> raw.copyOfRange(payloadOffset, payloadOffset + payloadLength)
+            }
+
+        fun contentType(): String? =
+            headers.entries.firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }?.value
     }
 
     // ── Frames de texto ─────────────────────────────────────────────────────
@@ -89,18 +103,20 @@ object AudioFrameParser {
                 if (headerText.contains(EdgeProtocolConstants.HEADER_PATH)) {
                     return BinaryFrame(
                         headers = parseTextFrameHeaders(headerText),
-                        payload = frame.copyOfRange(audioStart, frame.size)
+                        raw = frame,
+                        payloadOffset = audioStart
                     )
                 }
             }
         }
         // Respaldo: separador \r\n\r\n en cualquier parte (frames sin prefijo).
         val sep = indexOfDoubleCrlf(frame, 0, frame.size - 4)
-        if (sep < 0) return BinaryFrame(emptyMap(), frame)
+        if (sep < 0) return BinaryFrame(emptyMap(), frame, 0)
         val headerText = String(frame, 0, sep, Charsets.US_ASCII)
         return BinaryFrame(
             headers = parseTextFrameHeaders(headerText),
-            payload = frame.copyOfRange(sep + 4, frame.size)
+            raw = frame,
+            payloadOffset = sep + 4
         )
     }
 

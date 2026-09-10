@@ -45,7 +45,7 @@ object TextSanitizer {
             .replace("\t", " ")  // Tabs a espacios (1 tab = 1 espacio)
             .replace("\n", "")  // Newlines se eliminan
             .replace("\r", "")  // Carriage returns se eliminan
-            .replace(Regex(" +"), " ")  // Colapsar espacios múltiples
+            .replace(SPACES, " ")  // Colapsar espacios múltiples
             .trim()
     }
 
@@ -92,4 +92,6 @@ object TextSanitizer {
         point == 0x9 || point == 0xA || point == 0xD ||
             point in 0x20..0xD7FF || point in 0xE000..0xFFFD ||
             point in 0x10000..0x10FFFF
+
+    private val SPACES = Regex(" +")
 }

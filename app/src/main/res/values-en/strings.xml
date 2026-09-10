@@ -96,12 +96,14 @@
     <string name="user_agent_dialog_title">Edge User-Agent</string>
     <string name="user_agent_dialog_hint">Use the DESKTOP Edge one with major version and zeros. Verified: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0 — The Sec-MS-GEC token uses version 1-143.0.3650.75 independently.</string>
     <string name="user_agent_updated">User-Agent updated. The next synthesis will use it.</string>
+    <string name="user_agent_invalid">User-Agent rejected: printable ASCII only, no line breaks.</string>
     <string name="user_agent_restored">User-Agent restored to the verified value.</string>
 
     <!-- Origin -->
     <string name="origin_dialog_title">Handshake Origin</string>
     <string name="origin_dialog_hint">The handshake may require a specific Origin. Try, in order: chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold (immersive reader, verified) and https://www.bing.com. It is saved and used by the next synthesis.</string>
     <string name="origin_updated">Origin updated. The next synthesis will use it.</string>
+    <string name="origin_invalid">Origin rejected: use chrome-extension://, https:// or http://, without control characters.</string>
     <string name="origin_restored">Origin restored to the verified value.</string>
 
     <string name="error_cancelled">Synthesis cancelled by the user or by a new request.</string>

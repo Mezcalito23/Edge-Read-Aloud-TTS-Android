@@ -79,7 +79,9 @@ class SettingsStore(context: Context) {
         return if (Holder.pendingWrites.get() == 0) disk else Holder.snapshot
     }
 
-    fun setVoice(voice: String) = applyAndPersist({ it.copy(voice = voice) }) { it[K_VOICE] = voice }
+    fun setVoice(voice: String) = applyAndPersist(
+        { it.copy(voice = voice, locale = LocaleCodes.localeOfVoiceName(voice)) }
+    ) { it[K_VOICE] = voice }
 
     fun setRate(percent: Int) {
         val value = percent.coerceIn(-50, 50)
@@ -94,18 +96,22 @@ class SettingsStore(context: Context) {
     fun setCacheEnabled(enabled: Boolean) =
         applyAndPersist({ it.copy(cacheEnabled = enabled) }) { it[K_CACHE] = enabled }
 
-    fun setUserAgent(ua: String) {
+    fun setUserAgent(ua: String): Boolean {
+        if (!HeaderPolicy.isUserAgent(ua)) return false
         val value = ua.trim()
         applyAndPersist({ it.copy(userAgent = value) }) { it[K_USER_AGENT] = value }
+        return true
     }
 
     fun resetUserAgent() = applyAndPersist(
         { it.copy(userAgent = EdgeProtocolConstants.DEFAULT_USER_AGENT) }
     ) { it.remove(K_USER_AGENT) }
 
-    fun setOrigin(o: String) {
+    fun setOrigin(o: String): Boolean {
+        if (!HeaderPolicy.isOrigin(o)) return false
         val value = o.trim()
         applyAndPersist({ it.copy(origin = value) }) { it[K_ORIGIN] = value }
+        return true
     }
 
     fun resetOrigin() = applyAndPersist(
@@ -191,16 +197,22 @@ class SettingsStore(context: Context) {
             Holder.awaitInitialized()
         }
 
-        fun snapshotOf(prefs: Preferences): Snapshot = Snapshot(
-            locale = prefs[K_LOCALE] ?: EdgeProtocolConstants.DEFAULT_LOCALE,
-            voice = prefs[K_VOICE] ?: EdgeProtocolConstants.DEFAULT_VOICE,
+        fun snapshotOf(prefs: Preferences): Snapshot {
+            val voice = prefs[K_VOICE] ?: EdgeProtocolConstants.DEFAULT_VOICE
+            return Snapshot(
+            locale = LocaleCodes.localeOfVoiceName(voice),
+            voice = voice,
             ratePercent = prefs[K_RATE] ?: 0,
             pitchHz = prefs[K_PITCH] ?: 0,
             cacheEnabled = prefs[K_CACHE] ?: true,
             voicesUrl = prefs[K_VOICES_URL] ?: EdgeProtocolConstants.VOICES_LIST_URL,
             wsUrl = prefs[K_WS_URL] ?: EdgeProtocolConstants.WS_BASE_URL,
-            userAgent = prefs[K_USER_AGENT] ?: EdgeProtocolConstants.DEFAULT_USER_AGENT,
-            origin = prefs[K_ORIGIN] ?: EdgeProtocolConstants.DEFAULT_ORIGIN,
+            userAgent = HeaderPolicy.orDefaultUserAgent(
+                prefs[K_USER_AGENT] ?: EdgeProtocolConstants.DEFAULT_USER_AGENT
+            ),
+            origin = HeaderPolicy.orDefaultOrigin(
+                prefs[K_ORIGIN] ?: EdgeProtocolConstants.DEFAULT_ORIGIN
+            ),
             uiLanguage = prefs[K_UI_LANG].orEmpty(),
             unifiedVoiceMode = prefs[K_UNIFIED_VOICE] ?: true,
             lastSpanishVoice = prefs[K_LAST_ES_VOICE] ?: EdgeProtocolConstants.DEFAULT_VOICE,
@@ -208,7 +220,8 @@ class SettingsStore(context: Context) {
             handshakeDebug = prefs[K_HS_DEBUG].orEmpty(),
             catalogUpdatedAt = prefs[K_CATALOG_TS] ?: 0L,
             lastMetrics = prefs[K_LAST_METRICS].orEmpty()
-        )
+            )
+        }
     }
 
     private object Holder {
