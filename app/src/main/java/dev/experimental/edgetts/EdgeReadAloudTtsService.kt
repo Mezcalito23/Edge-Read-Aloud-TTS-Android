@@ -209,7 +209,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         if (code >= TextToSpeech.LANG_AVAILABLE) {
             currentLanguage = arrayOf(lang, country, variant)
             SharedProtocol.noteSampleLocale(lang, country)
-            if (callerKind() != VoiceResolver.Caller.Reader) {
+            if (callerKind() == VoiceResolver.Caller.SettingsUi) {
                 SharedProtocol.pinSettingsLocale(lang, country)
             }
         }
@@ -228,6 +228,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     ): String? {
         if (normLang(lang).isEmpty()) return null
         val catalogVoices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
+        val pin = pinnedLocale()
         return VoiceResolver.resolve(
             explicitVoiceName = null,
             requestLang = lang,
@@ -236,7 +237,10 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             loadedCountry = "",
             configuredVoice = snap.voice,
             unified = snap.unifiedVoiceMode,
-            catalog = catalogVoices
+            catalog = catalogVoices,
+            caller = callerKind(),
+            pinnedLang = pin.first,
+            pinnedCountry = pin.second
         )
     }
 
@@ -258,7 +262,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val snap = settings?.snapshot()
             ?: return voiceForLanguage(lang, country)
         val resolved = resolveDefaultVoiceFor(lang, country, snap)
-        if (callerKind() != VoiceResolver.Caller.Reader) {
+        if (callerKind() == VoiceResolver.Caller.SettingsUi) {
             SharedProtocol.pinSettingsLocale(lang, country)
         }
         SharedProtocol.noteSampleLocale(lang, country)
@@ -304,7 +308,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     private fun resolveVoice(request: SynthesisRequest, snap: SettingsStore.Snapshot): String {
         val catalogVoices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
         val loaded = currentLanguage
-        val caller = callerKind()
+        val caller = callerKind(request)
         val pin = pinnedLocale()
         val voice = VoiceResolver.resolve(
             explicitVoiceName = request.voiceName,
@@ -341,12 +345,24 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         return lang to country
     }
 
-    private fun callerKind(): VoiceResolver.Caller {
+    /**
+     * onSynthesizeText corre en un hilo del servicio: getCallingUid() somos
+     * nosotros, no Play Books. OwnApp solo si el extra [OWN_PARAM] viene en
+     * el speak(); Ajustes por paquete Binder o por la ventana de GetSampleText.
+     */
+    private fun callerKind(request: SynthesisRequest? = null): VoiceResolver.Caller {
+        val own = request?.params?.getString(VoiceResolver.OWN_PARAM)
+        if (!own.isNullOrBlank()) return VoiceResolver.Caller.OwnApp
+        val utterance = request?.params?.getString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID)
+        if (utterance == VoiceResolver.OWN_UTTERANCE) return VoiceResolver.Caller.OwnApp
+        if (SharedProtocol.isSettingsSample()) return VoiceResolver.Caller.SettingsUi
         val uid = android.os.Binder.getCallingUid()
-        if (uid == android.os.Process.myUid()) return VoiceResolver.Caller.OwnApp
-        val pkgs = runCatching { packageManager.getPackagesForUid(uid) }.getOrNull() ?: return VoiceResolver.Caller.Reader
-        if (pkgs.any { it.contains("settings", ignoreCase = true) }) {
-            return VoiceResolver.Caller.SettingsUi
+        if (uid != android.os.Process.myUid()) {
+            val pkgs = runCatching { packageManager.getPackagesForUid(uid) }.getOrNull()
+            if (pkgs != null && pkgs.any { it.contains("settings", ignoreCase = true) }) {
+                return VoiceResolver.Caller.SettingsUi
+            }
+            return VoiceResolver.Caller.Reader
         }
         return VoiceResolver.Caller.Reader
     }
@@ -437,10 +453,14 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
 
         val voice = resolveVoice(request, snap)
+        val caller = callerKind(request)
+        val forceDemo = caller == VoiceResolver.Caller.SettingsUi ||
+            SharedProtocol.isSettingsSample()
         val text = SampleTexts.alignDemo(
             TextSanitizer.removeIncompatibleCharacters(raw),
             voice,
-            unified = snap.unifiedVoiceMode
+            unified = snap.unifiedVoiceMode,
+            force = forceDemo
         )
         if (text.isBlank()) {
             runCatching {
@@ -474,7 +494,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
 
         AppLog.d(TAG) {
-            "voz resuelta=$voice unificado=${snap.unifiedVoiceMode} pedida=${request.voiceName ?: ""}"
+            "voz resuelta=$voice unificado=${snap.unifiedVoiceMode} " +
+                "caller=$caller pedida=${request.voiceName ?: ""}"
         }
         val rate = SsmlBuilder.signedPercent(effectiveRatePercent(snap, request))
         val pitch = SsmlBuilder.signedHertz(effectivePitchHz(snap, request))

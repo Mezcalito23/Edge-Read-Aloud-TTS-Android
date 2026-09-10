@@ -30,12 +30,18 @@ object SampleTexts {
 
     fun forIso2(iso2: String): String = SAMPLES[iso2] ?: SAMPLES["en"].orEmpty()
 
-    fun alignDemo(text: String, voiceName: String, unified: Boolean = false): String {
+    fun alignDemo(
+        text: String,
+        voiceName: String,
+        unified: Boolean = false,
+        force: Boolean = false
+    ): String {
         val voiceIso2 = iso2Language(
             LocaleCodes.localeOfVoiceName(voiceName).substringBefore('-')
         )
         if (voiceIso2.isEmpty()) return text
         if (text.length > 220) return text
+        if (force) return forIso2(voiceIso2)
         val isKnownSample = SAMPLES.values.any { it.equals(text, ignoreCase = true) }
         if (unified && (isKnownSample || looksLikeSettingsDemo(text))) {
             return forIso2(voiceIso2)
