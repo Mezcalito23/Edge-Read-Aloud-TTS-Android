@@ -20,7 +20,7 @@ class CacheRepositoryTest {
 
     @Before
     fun setUp() {
-        root = File(System.getProperty("java.io.tmpdir"), "edge-pcm-${System.nanoTime()}").also {
+        root = File(System.getProperty("java.io.tmpdir") ?: ".", "edge-pcm-${System.nanoTime()}").also {
             it.mkdirs()
         }
         repo = CacheRepository(root)
