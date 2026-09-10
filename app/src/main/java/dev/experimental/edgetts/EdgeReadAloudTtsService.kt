@@ -87,49 +87,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
     // ── Idioma y voces ──────────────────────────────────────────────────────
 
-    // Caché por proceso de los locales soportados, en DOBLE formato (ISO2 e
-    // ISO3). onIsLanguageAvailable se invoca cientos de veces al abrir los
-    // ajustes del sistema, así que no se relee el JSON en cada llamada. Solo
-    // se cachea cuando hay datos: si el catálogo aún no existe, se reintenta.
-    //
-    // La negociación compara en ambos formatos como seguro: en algunos
-    // dispositivos la comparación ISO3 fallaba por un quirk de ICU (la
-    // consulta se normalizaba bien pero el set no contenía la entrada) y
-    // TODO respondía LANG_AVAILABLE en vez de LANG_COUNTRY_AVAILABLE. Con
-    // doble formato, la coincidencia exacta de país siempre prende.
-    private data class LocaleSets(
-        val fullIso2: Set<String>,   // "es-mx", "en-us", …
-        val langsIso2: Set<String>,  // "es", "en", …
-        val fullIso3: Set<String>,   // "spa-mex", "eng-usa", …
-        val langsIso3: Set<String>   // "spa", "eng", …
-    )
-
-    @Volatile
-    private var localeSets: LocaleSets? = null
-
-    private fun supportedLocaleSets(): LocaleSets {
-        localeSets?.let { return it }
-        val voices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
-        val rawLocales = (voices.map { it.locale } + EdgeProtocolConstants.DEFAULT_LOCALE)
-            .filter { it.isNotBlank() }
-            .map { it.trim().lowercase(Locale.ROOT) }
-        val fullIso2 = rawLocales.toSet()
-        val langsIso2 = fullIso2.map { it.substringBefore('-') }.toSet()
-        val fullIso3 = rawLocales.mapNotNull { toIso3(it) }.toSet()
-        val langsIso3 = fullIso3.map { it.substringBefore('-') }.toSet()
-        val sets = LocaleSets(fullIso2, langsIso2, fullIso3, langsIso3)
-        if (fullIso2.size > 1 || fullIso3.size > 1) localeSets = sets
-        return sets
-    }
-
-    /**
-     * Normaliza un locale ("es-mx", "es-MX", "spa-mex"…) a ISO3 minúsculo
-     * ("spa-mex"). Usa Locale.isO3Language/isO3Country, que aceptan tanto ISO2
-     * como ISO3 y devuelven siempre ISO3. Devuelve null si el idioma no se
-     * puede resolver.
-     */
-    private fun toIso3(locale: String): String? = LocaleCodes.toIso3Locale(locale)
-
     // ── Voces expuestas: TODO el catálogo ────────────────────────────────────
     // Se exponen las ~322 voces del catálogo, cada una con SU locale real.
     // Es imprescindible para la integración con el sistema: el framework
@@ -208,32 +165,15 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
      * nunca muestra "idioma no soportado".
      */
     private fun languageAvailability(lang: String, country: String): Int {
-        val sets = supportedLocaleSets()
-        val l3 = normLang(lang)
-        val c3 = normCountry(country)
-        // ISO2 derivados de los ISO3 con una conversión REAL (Locale("spa")
-        // .language devuelve "spa", no "es", así que usamos las tablas de
-        // Locale). Doble formato como seguro ante quirks de ICU: la
-        // coincidencia exacta de país prende LANG_COUNTRY_AVAILABLE (2).
-        val l2 = if (l3.isNotEmpty()) iso3ToIso2Lang(l3) else ""
-        val c2 = if (c3.isNotEmpty()) iso3ToIso2Country(c3) else ""
-
-        val result = when {
-            l3.isEmpty() && l2.isEmpty() -> TextToSpeech.LANG_NOT_SUPPORTED
-            c3.isNotEmpty() && (sets.fullIso3.contains("$l3-$c3") ||
-                (c2.isNotEmpty() && sets.fullIso2.contains("$l2-$c2"))) ->
-                TextToSpeech.LANG_COUNTRY_AVAILABLE
-            sets.langsIso3.contains(l3) || (l2.isNotEmpty() && sets.langsIso2.contains(l2)) ->
-                TextToSpeech.LANG_AVAILABLE
-            else -> TextToSpeech.LANG_NOT_SUPPORTED
-        }
-
-        // Diagnóstico INCONDICIONAL (Hardy): muestra la consulta, la
-        // normalización y el resultado, para detectar cualquier fallo de
-        // negociación en la próxima captura de logcat.
+        val locales = runCatching { catalog?.cached() }.getOrNull().orEmpty().map { it.locale }
+        val result = LanguageAvailability.code(lang, country, locales)
         AppLog.d(TAG) {
+            val l3 = normLang(lang)
+            val c3 = normCountry(country)
+            val l2 = if (l3.isNotEmpty()) iso3ToIso2Lang(l3) else ""
+            val c2 = if (c3.isNotEmpty()) iso3ToIso2Country(c3) else ""
             "languageAvailability($lang,$country) → $result " +
-                "(iso3=$l3-$c3 · iso2=$l2-$c2 · catálogo=${sets.fullIso3.size})"
+                "(iso3=$l3-$c3 · iso2=$l2-$c2 · catálogo=${locales.size})"
         }
         return result
     }
@@ -332,10 +272,11 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 )
             )
         } else catalogVoices
+        val ordered = LanguageAvailability.orderVoices(list, configuredName)
         AppLog.d(TAG) {
-            "onGetVoices: exponiendo ${list.size} voces (configurada=$configuredName)"
+            "onGetVoices: exponiendo ${ordered.size} voces (configurada=$configuredName)"
         }
-        return list.map { edgeToAndroid(it) }
+        return ordered.map { edgeToAndroid(it) }
     }
 
     /**
