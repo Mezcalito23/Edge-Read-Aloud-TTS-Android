@@ -606,11 +606,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 }.isSuccess
             } else true
 
-        if (!ensureStarted(EdgeProtocolConstants.SAMPLE_RATE_HZ)) {
-            guard.error(callback, tr(R.string.error_audio_start))
-            return
-        }
-
+        val textLen = raw.length
         var charBase = 0
         var framesDelivered = 0
         try {
@@ -623,19 +619,17 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
                 when (val outcome = synthesizeSegment(segment, snap, voice, rate, pitch, metrics)) {
                     is SegmentOutcome.Ok -> {
-                        val ranges = if (outcome.ranges.isNotEmpty()) outcome.ranges
-                        else listOf(AudioFrameParser.TimedRange(0L, 0, segment.length))
-                        for (r in ranges) {
-                            val marker = framesDelivered +
-                                AudioFrameParser.ticksToFrames(r.offsetTicks, outcome.sampleRateHz)
-                            runCatching {
-                                callback.rangeStart(
-                                    marker,
-                                    charBase + r.start,
-                                    charBase + r.end
-                                )
-                            }
+                        if (!ensureStarted(outcome.sampleRateHz)) {
+                            guard.error(callback, tr(R.string.error_audio_start))
+                            return
                         }
+                        val pcmFrames = (outcome.pcm.size / 2).coerceAtLeast(1)
+                        val ranges = if (outcome.ranges.isNotEmpty()) outcome.ranges
+                        else AudioFrameParser.estimateWordRanges(segment, pcmFrames)
+                        emitRangeStarts(
+                            callback, ranges, outcome.sampleRateHz,
+                            framesDelivered, charBase, textLen
+                        )
                         if (!deliver(outcome.pcm, callback)) {
                             if (stopRequested) {
                                 guard.error(callback, TextToSpeech.STOPPED)
@@ -828,6 +822,30 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             return SegmentOutcome.Ok(decoded.pcm, decoded.sampleRateHz, ranges)
         }
         return decoded
+    }
+
+    /**
+     * Marcas para Play Books. AudioTrack ignora el frame 0, así que el
+     * marcador nunca es 0. Índices recortados al texto original del request.
+     */
+    private fun emitRangeStarts(
+        callback: SynthesisCallback,
+        ranges: List<AudioFrameParser.TimedRange>,
+        sampleRateHz: Int,
+        framesDelivered: Int,
+        charBase: Int,
+        textLen: Int
+    ) {
+        if (textLen <= 0) return
+        for (r in ranges) {
+            val start = (charBase + r.start).coerceIn(0, textLen)
+            val end = (charBase + r.end).coerceIn(start, textLen)
+            if (end <= start) continue
+            val marker = (
+                framesDelivered + AudioFrameParser.ticksToFrames(r.offsetTicks, sampleRateHz)
+                ).coerceAtLeast(1)
+            runCatching { callback.rangeStart(marker, start, end) }
+        }
     }
 
     /**

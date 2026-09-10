@@ -126,6 +126,26 @@ class AudioFrameParserTest {
         assertEquals(5, ranges[1].start)
         assertEquals(10, ranges[1].end)
         assertEquals(12_000, AudioFrameParser.ticksToFrames(5_000_000L, 24000))
+        assertEquals(1, AudioFrameParser.ticksToFrames(0L, 24000))
+    }
+
+    @Test
+    fun parseTimedRangesAcceptsStringText() {
+        val json = """{"Metadata":[{"Type":"WordBoundary","Data":{"Offset":1000,"text":"Hola"}}]}"""
+        val ranges = AudioFrameParser.parseTimedRanges(listOf(json), "Hola")
+        assertEquals(1, ranges.size)
+        assertEquals(0, ranges[0].start)
+        assertEquals(4, ranges[0].end)
+    }
+
+    @Test
+    fun estimateWordRangesNeverUsesFrameZero() {
+        val marks = AudioFrameParser.estimateWordRanges("Hola mundo", 24000)
+        assertEquals(2, marks.size)
+        marks.forEach { m ->
+            assertTrue(AudioFrameParser.ticksToFrames(m.offsetTicks, 24000) >= 1)
+            assertTrue(m.end > m.start)
+        }
     }
 
     @Test
