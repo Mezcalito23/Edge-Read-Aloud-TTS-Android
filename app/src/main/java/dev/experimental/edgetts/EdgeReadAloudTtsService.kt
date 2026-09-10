@@ -570,7 +570,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
 
         val segments = runCatching {
-            TextSegmenter.segment(text, { stopRequested }, TextSegmenter.OPERATIONAL_SEGMENT_CHARS)
+            TextSegmenter.segment(text, { stopRequested }, TextSegmenter.OPERATIONAL_SEGMENT_BYTES)
         }.getOrElse {
             guard.error(callback, tr(R.string.error_segment_failed))
             return
