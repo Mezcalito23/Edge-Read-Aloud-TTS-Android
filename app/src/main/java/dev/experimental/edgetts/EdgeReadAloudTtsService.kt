@@ -209,6 +209,9 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         if (code >= TextToSpeech.LANG_AVAILABLE) {
             currentLanguage = arrayOf(lang, country, variant)
             SharedProtocol.noteSampleLocale(lang, country)
+            if (callerKind() != VoiceResolver.Caller.Reader) {
+                SharedProtocol.pinSettingsLocale(lang, country)
+            }
         }
         AppLog.d(TAG) { "onLoadLanguage($lang,$country,$variant) → $code" }
         return code
@@ -255,6 +258,9 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val snap = settings?.snapshot()
             ?: return voiceForLanguage(lang, country)
         val resolved = resolveDefaultVoiceFor(lang, country, snap)
+        if (callerKind() != VoiceResolver.Caller.Reader) {
+            SharedProtocol.pinSettingsLocale(lang, country)
+        }
         SharedProtocol.noteSampleLocale(lang, country)
         AppLog.d(TAG) { "onGetDefaultVoiceNameFor($lang,$country,$variant) → ${resolved ?: "null"} (unificado=${snap.unifiedVoiceMode})" }
         return resolved
@@ -298,7 +304,9 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     private fun resolveVoice(request: SynthesisRequest, snap: SettingsStore.Snapshot): String {
         val catalogVoices = runCatching { catalog?.cached() }.getOrNull().orEmpty()
         val loaded = currentLanguage
-        return VoiceResolver.resolve(
+        val caller = callerKind()
+        val pin = pinnedLocale()
+        val voice = VoiceResolver.resolve(
             explicitVoiceName = request.voiceName,
             requestLang = request.language.orEmpty(),
             requestCountry = request.country.orEmpty(),
@@ -306,8 +314,41 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             loadedCountry = loaded.getOrElse(1) { "" },
             configuredVoice = snap.voice,
             unified = snap.unifiedVoiceMode,
-            catalog = catalogVoices
+            catalog = catalogVoices,
+            caller = caller,
+            pinnedLang = pin.first,
+            pinnedCountry = pin.second
         )
+        AppLog.d(TAG) {
+            "resolve caller=$caller pin=${pin.first}/${pin.second}"
+        }
+        return voice
+    }
+
+    private fun pinnedLocale(): Pair<String, String> {
+        if (SharedProtocol.pinnedLang.isNotBlank()) {
+            return SharedProtocol.pinnedLang to SharedProtocol.pinnedCountry
+        }
+        val raw = runCatching {
+            android.provider.Settings.Secure.getString(contentResolver, "tts_default_locale")
+        }.getOrNull().orEmpty()
+        val key = "$packageName:"
+        val part = raw.split(',').map { it.trim() }
+            .firstOrNull { it.startsWith(key, ignoreCase = true) } ?: return "" to ""
+        val loc = part.substring(key.length).replace('_', '-')
+        val lang = loc.substringBefore('-')
+        val country = loc.substringAfter('-', "").substringBefore('-')
+        return lang to country
+    }
+
+    private fun callerKind(): VoiceResolver.Caller {
+        val uid = android.os.Binder.getCallingUid()
+        if (uid == android.os.Process.myUid()) return VoiceResolver.Caller.OwnApp
+        val pkgs = runCatching { packageManager.getPackagesForUid(uid) }.getOrNull() ?: return VoiceResolver.Caller.Reader
+        if (pkgs.any { it.contains("settings", ignoreCase = true) }) {
+            return VoiceResolver.Caller.SettingsUi
+        }
+        return VoiceResolver.Caller.Reader
     }
 
     // ── Velocidad y tono (ajustes de la app + sliders de Android) ────────────
@@ -398,7 +439,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val voice = resolveVoice(request, snap)
         val text = SampleTexts.alignDemo(
             TextSanitizer.removeIncompatibleCharacters(raw),
-            voice
+            voice,
+            unified = snap.unifiedVoiceMode
         )
         if (text.isBlank()) {
             runCatching {

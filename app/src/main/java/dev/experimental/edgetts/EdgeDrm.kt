@@ -174,9 +174,24 @@ object SharedProtocol {
     var lastSampleIso2: String = ""
         private set
 
+    @Volatile
+    var pinnedLang: String = ""
+        private set
+
+    @Volatile
+    var pinnedCountry: String = ""
+        private set
+
     fun noteSampleLocale(lang: String, country: String = "") {
         val iso2 = SampleTexts.iso2Language(lang.ifBlank { country })
         if (iso2.isNotEmpty()) lastSampleIso2 = iso2
+    }
+
+    fun pinSettingsLocale(lang: String, country: String) {
+        if (LocaleCodes.normLang(lang).isEmpty()) return
+        pinnedLang = lang
+        pinnedCountry = country
+        noteSampleLocale(lang, country)
     }
 
     @Volatile

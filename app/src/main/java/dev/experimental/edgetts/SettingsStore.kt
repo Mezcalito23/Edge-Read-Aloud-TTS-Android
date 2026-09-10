@@ -200,6 +200,8 @@ class SettingsStore(context: Context) {
             Holder.awaitInitialized()
         }
 
+        fun current(): Snapshot = Holder.snapshot
+
         fun snapshotOf(prefs: Preferences): Snapshot {
             val voice = prefs[K_VOICE] ?: EdgeProtocolConstants.DEFAULT_VOICE
             return Snapshot(

@@ -28,10 +28,15 @@ class VoiceResolverTest {
     )
 
     @Test
-    fun explicitVoiceWinsOverUnifiedAndLocale() {
+    fun unifiedIgnoresPlayBooksVoiceName() {
         assertEquals(
-            "es-ES-ElviraNeural",
-            resolve(explicit = "es-ES-ElviraNeural", lang = "spa", country = "MEX", unified = true)
+            "es-MX-DaliaNeural",
+            resolve(
+                explicit = "es-UY-ValentinaNeural",
+                lang = "spa",
+                country = "URY",
+                unified = true
+            )
         )
     }
 
@@ -84,6 +89,26 @@ class VoiceResolverTest {
         assertEquals(
             "ur-IN-GulNeural",
             resolve(lang = "urd", country = "IND", configured = "es-MX-DaliaNeural")
+        )
+    }
+
+    @Test
+    fun readerUsesPinnedSettingsLocaleWhenUnifiedOff() {
+        assertEquals(
+            "en-US-AriaNeural",
+            VoiceResolver.resolve(
+                explicitVoiceName = "es-UY-ValentinaNeural",
+                requestLang = "spa",
+                requestCountry = "URY",
+                loadedLang = "spa",
+                loadedCountry = "URY",
+                configuredVoice = "es-MX-DaliaNeural",
+                unified = false,
+                catalog = catalog,
+                caller = VoiceResolver.Caller.Reader,
+                pinnedLang = "eng",
+                pinnedCountry = "USA"
+            )
         )
     }
 

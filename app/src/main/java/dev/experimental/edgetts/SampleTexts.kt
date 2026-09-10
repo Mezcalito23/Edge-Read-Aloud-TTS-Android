@@ -10,6 +10,12 @@ import java.util.Locale
 object SampleTexts {
 
     fun forRequested(languageExtra: String?, countryExtra: String? = null): String {
+        val snap = runCatching { SettingsStore.current() }.getOrNull()
+        if (snap != null && snap.unifiedVoiceMode && snap.voice.isNotBlank()) {
+            return forIso2(
+                iso2Language(LocaleCodes.localeOfVoiceName(snap.voice).substringBefore('-'))
+            )
+        }
         val fromExtra = iso2Language(languageExtra?.substringBefore('-').orEmpty())
         val fromHint = SharedProtocol.lastSampleIso2
         val iso2 = when {
@@ -24,14 +30,19 @@ object SampleTexts {
 
     fun forIso2(iso2: String): String = SAMPLES[iso2] ?: SAMPLES["en"].orEmpty()
 
-    fun alignDemo(text: String, voiceName: String): String {
+    fun alignDemo(text: String, voiceName: String, unified: Boolean = false): String {
         val voiceIso2 = iso2Language(
             LocaleCodes.localeOfVoiceName(voiceName).substringBefore('-')
         )
-        if (voiceIso2.isEmpty() || voiceIso2 == "es") return text
+        if (voiceIso2.isEmpty()) return text
         if (text.length > 220) return text
+        val isKnownSample = SAMPLES.values.any { it.equals(text, ignoreCase = true) }
+        if (unified && (isKnownSample || looksLikeSettingsDemo(text))) {
+            return forIso2(voiceIso2)
+        }
+        if (voiceIso2 == "es") return text
         if (scriptLooksNative(text, voiceIso2)) return text
-        if (!looksLikeSettingsDemo(text)) return text
+        if (!looksLikeSettingsDemo(text) && !isKnownSample) return text
         return forIso2(voiceIso2)
     }
 
