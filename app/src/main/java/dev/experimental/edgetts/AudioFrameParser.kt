@@ -86,8 +86,12 @@ object AudioFrameParser {
     )
 
     /**
-     * Word/SentenceBoundary de audio.metadata. Índices UTF-16 en [segment].
+     * WordBoundary de audio.metadata. Índices UTF-16 en [segment].
      * Offset en ticks de 100 ns del audio (rany2/edge-tts).
+     *
+     * Acepta `text` como objeto {Text, Length} o como string. No usa
+     * SentenceBoundary: se solapa con las palabras y Play Books se queda
+     * en el último rango del ráfaga.
      */
     fun parseTimedRanges(bodies: List<String>, segment: String): List<TimedRange> {
         if (segment.isEmpty() || bodies.isEmpty()) return emptyList()
@@ -98,27 +102,80 @@ object AudioFrameParser {
             val arr = root.optJSONArray("Metadata") ?: continue
             for (i in 0 until arr.length()) {
                 val item = arr.optJSONObject(i) ?: continue
-                val type = item.optString("Type")
-                if (type != "WordBoundary" && type != "SentenceBoundary") continue
+                if (item.optString("Type") != "WordBoundary") continue
                 val data = item.optJSONObject("Data") ?: continue
                 val ticks = data.optLong("Offset", -1L)
                 if (ticks < 0L) continue
-                val textObj = data.optJSONObject("text") ?: data.optJSONObject("Text")
-                val word = textObj?.optString("Text").orEmpty()
+                val word = wordFrom(data)
                 if (word.isEmpty()) continue
                 val idx = segment.indexOf(word, cursor)
-                val start = if (idx >= 0) idx else continue
-                val end = (start + word.length).coerceAtMost(segment.length)
-                cursor = end
+                val start: Int
+                val end: Int
+                if (idx >= 0) {
+                    start = idx
+                    end = (start + word.length).coerceAtMost(segment.length)
+                    cursor = end
+                } else {
+                    val len = word.length.coerceAtMost(segment.length - cursor)
+                    if (len <= 0) continue
+                    start = cursor
+                    end = start + len
+                    cursor = end
+                }
                 out += TimedRange(ticks, start, end)
             }
         }
         return out
     }
 
+    private fun wordFrom(data: JSONObject): String {
+        val obj = data.optJSONObject("text") ?: data.optJSONObject("Text")
+        if (obj != null) {
+            val w = obj.optString("Text")
+            if (w.isNotEmpty()) return w
+        }
+        val raw = data.optString("text")
+        return if (raw.isNotEmpty() && raw[0] != '{') raw else ""
+    }
+
     fun ticksToFrames(ticks: Long, sampleRateHz: Int): Int {
-        if (ticks <= 0L || sampleRateHz <= 0) return 0
-        return ((ticks * sampleRateHz) / 10_000_000L).toInt().coerceAtLeast(0)
+        if (sampleRateHz <= 0) return 1
+        if (ticks <= 0L) return 1
+        return ((ticks * sampleRateHz) / 10_000_000L).toInt().coerceAtLeast(1)
+    }
+
+    /**
+     * Fallback cuando no hay metadata (caché, parse vacío): una marca por
+     * palabra, repartida en [totalFrames]. Nunca usa el frame 0 (AudioTrack
+     * lo trata como “sin marcador”).
+     */
+    fun estimateWordRanges(text: String, totalFrames: Int): List<TimedRange> {
+        if (text.isEmpty()) return emptyList()
+        val words = ArrayList<IntRange>()
+        var i = 0
+        while (i < text.length) {
+            while (i < text.length && !text[i].isLetterOrDigit()) i++
+            if (i >= text.length) break
+            val start = i
+            while (i < text.length && text[i].isLetterOrDigit()) i++
+            words += start until i
+        }
+        if (words.isEmpty()) {
+            return listOf(TimedRange(1L, 0, text.length))
+        }
+        val totalChars = words.sumOf { it.last - it.first + 1 }.coerceAtLeast(1)
+        val frames = totalFrames.coerceAtLeast(words.size)
+        var acc = 0
+        return words.map { r ->
+            val marker = 1 + (acc.toLong() * (frames - 1) / totalChars).toInt()
+            acc += r.last - r.first + 1
+            TimedRange(framesToTicks(marker), r.first, r.last + 1)
+        }
+    }
+
+    fun framesToTicks(frames: Int, sampleRateHz: Int = EdgeProtocolConstants.SAMPLE_RATE_HZ): Long {
+        if (frames <= 0 || sampleRateHz <= 0) return 0L
+        return frames.toLong() * 10_000_000L / sampleRateHz
     }
 
     // ── Frames binarios ─────────────────────────────────────────────────────

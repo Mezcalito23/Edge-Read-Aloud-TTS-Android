@@ -339,7 +339,7 @@ class EdgeProtocolClient(
                                 .put(
                                     "metadataoptions",
                                     JSONObject()
-                                        .put("sentenceBoundaryEnabled", "true")
+                                        .put("sentenceBoundaryEnabled", "false")
                                         .put("wordBoundaryEnabled", "true")
                                 )
                                 .put("outputFormat", outputFormat)
