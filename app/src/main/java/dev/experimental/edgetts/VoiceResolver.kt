@@ -9,6 +9,8 @@ package dev.experimental.edgetts
  */
 object VoiceResolver {
 
+    const val OWN_PARAM = "dev.experimental.edgetts.own"
+
     enum class Caller { OwnApp, SettingsUi, Reader }
 
     fun resolve(
