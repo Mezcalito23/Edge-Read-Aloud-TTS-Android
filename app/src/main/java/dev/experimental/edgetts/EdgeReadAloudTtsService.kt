@@ -610,7 +610,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
 
         val segments = runCatching {
-            TextSegmenter.segment(text) { stopRequested }
+            TextSegmenter.segment(text, { stopRequested }, TextSegmenter.OPERATIONAL_SEGMENT_CHARS)
         }.getOrElse {
             guard.error(callback, "No se pudo segmentar el texto.")
             return
@@ -629,13 +629,11 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
 
         val voice = resolveVoice(request, snap)
-        // Velocidad y tono EFECTIVOS: combinan el ajuste de la app con los
-        // sliders de Ajustes de Android (request.speechRate / request.pitch,
-        // donde 100 = 1.0x). Antes se ignoraban estos últimos y mover los
-        // sliders del sistema no tenía efecto (Punto 4).
         val rate = SsmlBuilder.signedPercent(effectiveRatePercent(snap, request))
         val pitch = SsmlBuilder.signedHertz(effectivePitchHz(snap, request))
         val started = AtomicBoolean(false)
+        val metrics = SynthesisMetrics()
+        metrics.segments = segments.size
 
         fun ensureStarted(rate: Int): Boolean =
             if (started.compareAndSet(false, true)) {
@@ -649,46 +647,50 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 }.isSuccess
             } else true
 
-        for (segment in segments) {
-            if (guard.isFired) return
-            if (stopRequested) {
-                guard.error(callback, TextToSpeech.STOPPED)
-                return
-            }
-
-            when (val outcome = synthesizeSegment(segment, snap, voice, rate, pitch)) {
-                is SegmentOutcome.Ok -> {
-                    if (!ensureStarted(outcome.sampleRateHz)) {
-                        guard.error(callback, "No se pudo iniciar el canal de audio.")
-                        return
-                    }
-                    if (!deliver(outcome.pcm, callback)) {
-                        if (stopRequested) {
-                            guard.error(callback, TextToSpeech.STOPPED)
-                        } else {
-                            guard.error(callback, "No se pudo entregar el audio al sistema.") { msg ->
-                                runCatching { settings?.setLastError(msg) }
-                            }
-                        }
-                        return
-                    }
-                }
-
-                is SegmentOutcome.Failed -> {
-                    guard.error(callback, outcome.message) { msg ->
-                        runCatching { settings?.setLastError(msg) }
-                    }
-                    return
-                }
-
-                SegmentOutcome.Cancelled -> {
+        try {
+            for (segment in segments) {
+                if (guard.isFired) return
+                if (stopRequested) {
                     guard.error(callback, TextToSpeech.STOPPED)
                     return
                 }
-            }
-        }
 
-        if (!guard.isFired) guard.done(callback)
+                when (val outcome = synthesizeSegment(segment, snap, voice, rate, pitch, metrics)) {
+                    is SegmentOutcome.Ok -> {
+                        if (!ensureStarted(outcome.sampleRateHz)) {
+                            guard.error(callback, "No se pudo iniciar el canal de audio.")
+                            return
+                        }
+                        if (!deliver(outcome.pcm, callback)) {
+                            if (stopRequested) {
+                                guard.error(callback, TextToSpeech.STOPPED)
+                            } else {
+                                guard.error(callback, "No se pudo entregar el audio al sistema.") { msg ->
+                                    runCatching { settings?.setLastError(msg) }
+                                }
+                            }
+                            return
+                        }
+                    }
+
+                    is SegmentOutcome.Failed -> {
+                        guard.error(callback, outcome.message) { msg ->
+                            runCatching { settings?.setLastError(msg) }
+                        }
+                        return
+                    }
+
+                    SegmentOutcome.Cancelled -> {
+                        guard.error(callback, TextToSpeech.STOPPED)
+                        return
+                    }
+                }
+            }
+
+            if (!guard.isFired) guard.done(callback)
+        } finally {
+            runCatching { settings?.setLastMetrics(metrics.line()) }
+        }
     }
 
     private sealed class SegmentOutcome {
@@ -705,34 +707,54 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
      * formatos: el RIFF/PCM está verificado que NO produce audio en este
      * endpoint, así que reintentar con él solo gastaría peticiones.
      *
-     * La caché guarda SIEMPRE el PCM final decodificado a 24 kHz.
+     * La caché guarda el MP3 del WebSocket; SynthesisCallback recibe PCM.
      */
     private fun synthesizeSegment(
         segment: String,
         snap: SettingsStore.Snapshot,
         voice: String,
         rate: String,
-        pitch: String
+        pitch: String,
+        metrics: SynthesisMetrics
     ): SegmentOutcome {
+        val format = EdgeProtocolConstants.OUTPUT_FORMAT_MP3
         val cacheKey = cache?.key(
-            segment, voice, snap.locale, rate, pitch,
+            segment, voice, snap.locale, rate, pitch, format,
             EdgeProtocolConstants.PROTOCOL_VERSION
         )
 
         if (snap.cacheEnabled && cacheKey != null) {
-            cache?.read(cacheKey)?.let {
-                return SegmentOutcome.Ok(it, EdgeProtocolConstants.SAMPLE_RATE_HZ)
+            cache?.readMp3(cacheKey)?.let { mp3 ->
+                when (val decoded = decodeMp3(mp3, metrics)) {
+                    is SegmentOutcome.Ok -> {
+                        metrics.cacheHits++
+                        metrics.mp3Bytes += mp3.size
+                        return decoded
+                    }
+                    is SegmentOutcome.Cancelled -> return decoded
+                    is SegmentOutcome.Failed -> cache?.remove(cacheKey)
+                }
             }
         }
 
-        return synthOnce(
-            segment, snap, cacheKey, voice, rate, pitch,
-            outputFormat = EdgeProtocolConstants.OUTPUT_FORMAT_MP3,
-            decoder = mp3Decoder
+        metrics.cacheMisses++
+        return synthOnce(segment, snap, cacheKey, voice, rate, pitch, format, metrics)
+    }
+
+    private fun decodeMp3(mp3: ByteArray, metrics: SynthesisMetrics): SegmentOutcome {
+        val t0 = android.os.SystemClock.elapsedRealtime()
+        val decoded = runCatching { mp3Decoder.decode(mp3) }
+        metrics.decodeMs += android.os.SystemClock.elapsedRealtime() - t0
+        return decoded.fold(
+            onSuccess = { SegmentOutcome.Ok(it.pcm, it.sampleRateHz) },
+            onFailure = {
+                if (it is SynthesisCancelledException) SegmentOutcome.Cancelled
+                else SegmentOutcome.Failed(ErrorMapper.spanish(it))
+            }
         )
     }
 
-    /** Un intento de síntesis con un formato (y decodificador) concretos. */
+    /** Un intento de síntesis de red; el buffer es MP3, no PCM. */
     private fun synthOnce(
         segment: String,
         snap: SettingsStore.Snapshot,
@@ -741,16 +763,13 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         rate: String,
         pitch: String,
         outputFormat: String,
-        decoder: AudioDecoder?
+        metrics: SynthesisMetrics
     ): SegmentOutcome {
         val latch = CountDownLatch(1)
         var failure: Throwable? = null
         val buffer = ByteArrayOutputStream()
 
         val client = http ?: return SegmentOutcome.Failed("Cliente HTTP no inicializado.")
-        // El proveedor se crea por intento: así siempre usa el User-Agent,
-        // el Origin y las URLs vigentes (editables desde la app sin
-        // recompilar). El diagnóstico se persiste para depurar desde la app.
         val prov: TtsProvider = EdgeProtocolClient(
             client,
             drm = SharedProtocol.drm,
@@ -761,13 +780,14 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             onDiagnostic = { d -> runCatching { settings?.setHandshakeDebug(d) } }
         )
 
+        val netStart = android.os.SystemClock.elapsedRealtime()
         val handle = prov.synthesize(
             text = segment,
             voice = voice,
             locale = snap.locale,
             rate = rate,
             pitch = pitch,
-            onPcmChunk = { chunk -> synchronized(buffer) { buffer.write(chunk) } },
+            onEncodedAudioChunk = { chunk -> synchronized(buffer) { buffer.write(chunk) } },
             onComplete = { latch.countDown() },
             onError = { t -> failure = t; latch.countDown() }
         )
@@ -778,6 +798,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             TimeUnit.MILLISECONDS
         )
         active = null
+        metrics.networkMs += android.os.SystemClock.elapsedRealtime() - netStart
 
         if (stopRequested) {
             handle.cancel()
@@ -795,41 +816,17 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             return SegmentOutcome.Failed(ErrorMapper.spanish(t))
         }
 
-        var pcm = synchronized(buffer) { buffer.toByteArray() }
-        if (pcm.isEmpty()) {
+        val mp3 = synchronized(buffer) { buffer.toByteArray() }
+        if (mp3.isEmpty()) {
             return SegmentOutcome.Failed("El proveedor no devolvió audio (respuesta vacía).")
         }
+        metrics.mp3Bytes += mp3.size
 
-        var sampleRate = EdgeProtocolConstants.SAMPLE_RATE_HZ
-
-        if (decoder != null) {
-            // Ruta MP3: decodificar a PCM 16-bit ANTES de tocar el callback.
-            val decoded = runCatching { decoder.decode(pcm) }
-                .getOrElse {
-                    if (it is SynthesisCancelledException) return SegmentOutcome.Cancelled
-                    return SegmentOutcome.Failed(ErrorMapper.spanish(it))
-                }
-            pcm = decoded.pcm
-            sampleRate = decoded.sampleRateHz
-        } else if (AudioFrameParser.detectFormat(pcm) == AudioFrameParser.PayloadFormat.COMPRESSED) {
-            // El servidor ignoró la petición de PCM y envió comprimido de
-            // todas formas (MP3 en la práctica): se decodifica igualmente.
-            val decoded = runCatching { mp3Decoder.decode(pcm) }
-                .getOrElse {
-                    return SegmentOutcome.Failed(
-                        ErrorMapper.spanish(UnsupportedAudioFormatException("datos comprimidos"))
-                    )
-                }
-            pcm = decoded.pcm
-            sampleRate = decoded.sampleRateHz
+        val decoded = decodeMp3(mp3, metrics)
+        if (decoded is SegmentOutcome.Ok && snap.cacheEnabled && cacheKey != null) {
+            runCatching { cache?.writeMp3(cacheKey, mp3) }
         }
-
-        // La caché guarda el PCM final (siempre 24 kHz con los formatos de
-        // Edge); nunca el audio comprimido ni el texto en claro como nombre.
-        if (snap.cacheEnabled && cacheKey != null && sampleRate == EdgeProtocolConstants.SAMPLE_RATE_HZ) {
-            runCatching { cache?.write(cacheKey, pcm) }
-        }
-        return SegmentOutcome.Ok(pcm, sampleRate)
+        return decoded
     }
 
     /**

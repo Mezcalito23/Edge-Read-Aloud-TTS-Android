@@ -13,9 +13,16 @@ object TextSegmenter {
 
     const val MAX_SEGMENT_CHARS: Int = EdgeProtocolConstants.MAX_SEGMENT_CHARS
 
-    fun segment(text: String): List<String> = segment(text) { false }
+    /** Tope operativo de Fase 3: primera audio más rápida y cancelación más fina. */
+    const val OPERATIONAL_SEGMENT_CHARS: Int = 1200
 
-    fun segment(text: String, isCancelled: () -> Boolean): List<String> {
+    fun segment(text: String): List<String> = segment(text, { false }, MAX_SEGMENT_CHARS)
+
+    fun segment(text: String, isCancelled: () -> Boolean): List<String> =
+        segment(text, isCancelled, MAX_SEGMENT_CHARS)
+
+    fun segment(text: String, isCancelled: () -> Boolean, maxChars: Int): List<String> {
+        val limit = maxChars.coerceAtLeast(1).coerceAtMost(MAX_SEGMENT_CHARS)
         val result = ArrayList<String>()
         val paragraphs = text.split(Regex("\\n+"))
             .map { it.trim() }
@@ -28,16 +35,16 @@ object TextSegmenter {
             for (sentence in splitSentences(paragraph)) {
                 if (isCancelled()) break
 
-                if (sentence.length > MAX_SEGMENT_CHARS) {
+                if (sentence.length > limit) {
                     if (current.isNotEmpty()) {
                         result += current.toString().trim()
                         current.clear()
                     }
-                    result += splitOversized(sentence)
+                    result += splitOversized(sentence, limit)
                     continue
                 }
 
-                if (current.isNotEmpty() && current.length + sentence.length + 1 > MAX_SEGMENT_CHARS) {
+                if (current.isNotEmpty() && current.length + sentence.length + 1 > limit) {
                     result += current.toString().trim()
                     current.clear()
                 }
@@ -59,7 +66,7 @@ object TextSegmenter {
             .filter { it.isNotEmpty() }
 
     /** Una "frase" sin puntuación que supera el límite: primero comas, luego espacios. */
-    private fun splitOversized(sentence: String): List<String> {
+    private fun splitOversized(sentence: String, limit: Int): List<String> {
         val chunks = ArrayList<String>()
         val pending = StringBuilder()
 
@@ -72,12 +79,12 @@ object TextSegmenter {
 
         for (clause in sentence.split(Regex("(?<=[,;])\\s+"))) {
             if (clause.isEmpty()) continue
-            if (pending.isNotEmpty() && pending.length + clause.length + 1 > MAX_SEGMENT_CHARS) {
+            if (pending.isNotEmpty() && pending.length + clause.length + 1 > limit) {
                 flush()
             }
-            if (clause.length > MAX_SEGMENT_CHARS) {
+            if (clause.length > limit) {
                 flush()
-                chunks += splitByWords(clause)
+                chunks += splitByWords(clause, limit)
             } else {
                 if (pending.isNotEmpty()) pending.append(' ')
                 pending.append(clause)
@@ -87,24 +94,22 @@ object TextSegmenter {
         return chunks.filter { it.isNotEmpty() }
     }
 
-    /** Corta por espacios sin partir palabras; solo un token degenerado se corta en duro. */
-    private fun splitByWords(text: String): List<String> {
+    private fun splitByWords(text: String, limit: Int): List<String> {
         val chunks = ArrayList<String>()
         val pending = StringBuilder()
 
-        // El lookbehind conserva el espacio al final de cada pieza.
         for (piece in text.split(Regex("(?<=\\s)"))) {
             if (piece.isEmpty()) continue
 
-            if (piece.length > MAX_SEGMENT_CHARS) {
+            if (piece.length > limit) {
                 if (pending.isNotEmpty()) {
                     chunks += pending.toString().trimEnd()
                     pending.clear()
                 }
-                chunks += piece.chunked(MAX_SEGMENT_CHARS)
+                chunks += piece.chunked(limit)
                 continue
             }
-            if (pending.length + piece.length > MAX_SEGMENT_CHARS) {
+            if (pending.length + piece.length > limit) {
                 chunks += pending.toString().trimEnd()
                 pending.clear()
             }
