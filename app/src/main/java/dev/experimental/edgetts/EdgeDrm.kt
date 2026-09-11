@@ -75,10 +75,6 @@ class EdgeDrm(private val state: ProtocolState) {
         return if (withTrailingZ) stamp + "Z" else stamp
     }
 
-    /**
-     * Ajuste absoluto con la cabecera Date del 403. Devuelve false si Date
-     * falta, no parsea o la deriva supera 24 h (no reintentar en ese caso).
-     */
     fun tryUpdateSkewFromDate(
         dateHeader: String?,
         localEpochSeconds: Long = System.currentTimeMillis() / 1000L
@@ -126,11 +122,6 @@ class EdgeDrm(private val state: ProtocolState) {
             }
         }
 
-        /**
-         * SHA-256 uppercase de "{ticks}{TrustedClientToken}".
-         * ticks = (unix + FILETIME 1601) redondeado a 5 min × 10^7.
-         * La versión de cliente NO entra en el hash.
-         */
         fun generateSecMsGec(unixSeconds: Long, trustedClientToken: String): String {
             var ticks = unixSeconds
             ticks += WIN_EPOCH_SECONDS
@@ -168,5 +159,63 @@ object SharedProtocol {
             .readTimeout(EdgeProtocolConstants.READ_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
             .pingInterval(EdgeProtocolConstants.PING_INTERVAL_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
             .build()
+    }
+
+    @Volatile
+    var lastSampleIso2: String = ""
+        private set
+
+    @Volatile
+    var pinnedLang: String = ""
+        private set
+
+    @Volatile
+    var pinnedCountry: String = ""
+        private set
+
+    fun noteSampleLocale(lang: String, country: String = "") {
+        val iso2 = SampleTexts.iso2Language(lang.ifBlank { country })
+        if (iso2.isNotEmpty()) lastSampleIso2 = iso2
+    }
+
+    fun pinSettingsLocale(lang: String, country: String) {
+        if (LocaleCodes.normLang(lang).isEmpty()) return
+        pinnedLang = lang
+        pinnedCountry = country
+        noteSampleLocale(lang, country)
+    }
+
+    @Volatile
+    var settingsSampleUntilElapsed: Long = 0L
+        private set
+
+    fun markSettingsSample(lang: String, country: String) {
+        settingsSampleUntilElapsed = android.os.SystemClock.elapsedRealtime() + 8_000L
+        if (LocaleCodes.normLang(lang).isNotEmpty()) {
+            pinSettingsLocale(lang, country)
+        }
+    }
+
+    fun isSettingsSample(): Boolean =
+        android.os.SystemClock.elapsedRealtime() < settingsSampleUntilElapsed
+
+    @Volatile
+    private var tts: EdgeProtocolClient? = null
+
+    @Volatile
+    private var ttsFp: EdgeProtocolClient.ConnectionFingerprint? = null
+
+    @Synchronized
+    fun ttsClient(
+        fp: EdgeProtocolClient.ConnectionFingerprint,
+        factory: () -> EdgeProtocolClient
+    ): EdgeProtocolClient {
+        val cur = tts
+        if (cur != null && ttsFp == fp) return cur
+        cur?.shutdown()
+        val created = factory()
+        tts = created
+        ttsFp = fp
+        return created
     }
 }

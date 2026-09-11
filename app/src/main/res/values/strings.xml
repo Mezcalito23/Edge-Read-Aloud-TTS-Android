@@ -68,8 +68,7 @@
     <string name="test_phrase">Hola. Esta es una prueba del motor Edge Read Aloud. La voz que escuchas se sintetiza en la nube.</string>
     <string name="voice_count_fmt">%1$d voces en catálogo · %2$d es-MX</string>
     <string name="unified_voice_switch">La voz elegida aquí manda en todo el sistema</string>
-    <string name="unified_voice_hint">Este botón decide QUÉ VOZ se usa, no si el sistema controla el motor. Activado: todo el sistema usa la voz elegida arriba para su idioma; si un libro está en español y tu voz es de otro idioma, se usa tu última voz de español (reconocible). Desactivado: el sistema elige la voz por el país de cada idioma. La velocidad, el tono y el ejemplo de Ajustes funcionan en ambos casos, porque dependen de que el motor reporte su idioma, no de este botón.</string>
-    <string name="voice_source_disclaimer">La voz que genere el motor TTS será la seleccionada en ESTA APP, no la del sistema Android, porque aquí hay más de una voz por idioma y región (el sistema solo ofrece una). Para que funcione como motor, debes elegir «Edge Read Aloud TTS» como motor preferido en Ajustes → Texto a voz del sistema. Para otros idiomas se usa automáticamente una voz del catálogo.</string>
+    <string name="unified_voice_hint">Activado: Neo, Play Books y el ejemplo de Ajustes usan siempre la voz y el idioma de arriba, aunque el libro esté en otro idioma. Desactivado: mandan la voz y el idioma de Ajustes → Texto a voz (España suena España, inglés británico suena británico). El texto largo de un libro no se traduce; solo cambia la voz.</string>
     <string name="catalog_updating">Actualizando catálogo…</string>
     <string name="catalog_updated_fmt">Catálogo actualizado (%1$d voces).</string>
     <string name="catalog_offline">Catálogo no disponible; usando respaldo local es-MX-DaliaNeural.</string>

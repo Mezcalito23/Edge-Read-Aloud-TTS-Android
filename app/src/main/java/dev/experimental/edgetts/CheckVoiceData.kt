@@ -22,9 +22,8 @@ import java.util.Locale
  *     Ajustes perdía su selección persistida y COLAPSABA.)
  *  3. Solo entradas con idioma Y país: las entradas de una sola parte
  *     ("es", "en") rompen el parseo de locales de algunos selectores.
- *  4. Sea cual sea la variante de español elegida en Ajustes, el motor
- *     sintetiza con la voz configurada en la app (lo resuelve
- *     `onGetDefaultVoiceNameFor`, no esta lista).
+ *  4. Unificado OFF: la variante de Ajustes (spa-ESP, eng-GBR…) determina
+ *     la voz regional. Unificado ON: la voz de la app se usa en todas partes.
  *
  * Esta actividad NUNCA lanza: lectura de extras tolerante (ArrayList,
  * String[] o String) y flujo completo en try/catch con FAIL de respaldo.
