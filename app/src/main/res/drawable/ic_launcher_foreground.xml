@@ -4,38 +4,51 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Official Bugdroid head in profile (Sesame-style puppet, mouth open). -->
+    <!-- Official Bugdroid (front): visor, body, arms, legs. Pac-Man mouth only. -->
+    <!-- Antennae -->
     <path
         android:fillColor="#3DDC84"
-        android:pathData="M42,28 m-3,0 a3,3 0 1,1 6,0 a3,3 0 1,1 -6,0" />
+        android:pathData="M40,22 m-3.1,0 a3.1,3.1 0 1,1 6.2,0 a3.1,3.1 0 1,1 -6.2,0" />
     <path
         android:fillColor="#3DDC84"
-        android:pathData="M58,24 m-3,0 a3,3 0 1,1 6,0 a3,3 0 1,1 -6,0" />
+        android:pathData="M68,22 m-3.1,0 a3.1,3.1 0 1,1 6.2,0 a3.1,3.1 0 1,1 -6.2,0" />
     <path
-        android:fillColor="#3DDC84"
-        android:pathData="M41.2,30 h2.4 v10 h-2.4 z" />
-    <path
-        android:fillColor="#3DDC84"
-        android:pathData="M57.2,26.5 h2.4 v10 h-2.4 z" />
-    <path
-        android:fillColor="#3DDC84"
-        android:pathData="M32,44 c0,-9 10,-16 24,-16 c8,0 16,3 20,9 v28 c-2,10 -12,18 -24,18 c-14,0 -20,-8 -20,-18 z" />
-    <path
-        android:fillColor="#0B1F33"
-        android:pathData="M50,50 m-4.2,0 a4.2,4.2 0 1,1 8.4,0 a4.2,4.2 0 1,1 -8.4,0" />
-    <path
-        android:fillColor="#0B1F33"
-        android:pathData="M68,62 m-7.5,0 a7.5,6.5 0 1,1 15,0 a7.5,6.5 0 1,1 -15,0" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M82,54 a8,8 0 0,1 0,16"
-        android:strokeWidth="2.2"
+        android:pathData="M40,22 L40,32"
+        android:strokeWidth="2.6"
         android:strokeColor="#3DDC84"
         android:strokeLineCap="round" />
     <path
-        android:fillColor="#00000000"
-        android:pathData="M88,50 a13,13 0 0,1 0,24"
-        android:strokeWidth="2.2"
+        android:pathData="M68,22 L68,32"
+        android:strokeWidth="2.6"
         android:strokeColor="#3DDC84"
         android:strokeLineCap="round" />
+    <!-- Head / visor, flat bottom, Pac-Man wedge on the right -->
+    <path
+        android:fillColor="#3DDC84"
+        android:pathData="M30,58 L30,42 C30,32 38,30 54,30 C66,30 74,32 78,38 L64,50 L78,56 L78,58 Z" />
+    <!-- Eyes -->
+    <path
+        android:fillColor="#0B1F33"
+        android:pathData="M44,44 m-3.4,0 a3.4,3.4 0 1,1 6.8,0 a3.4,3.4 0 1,1 -6.8,0" />
+    <path
+        android:fillColor="#0B1F33"
+        android:pathData="M62,44 m-3.4,0 a3.4,3.4 0 1,1 6.8,0 a3.4,3.4 0 1,1 -6.8,0" />
+    <!-- Body -->
+    <path
+        android:fillColor="#3DDC84"
+        android:pathData="M34,64 h40 a8,8 0 0,1 8,8 v14 a8,8 0 0,1 -8,8 h-40 a8,8 0 0,1 -8,-8 v-14 a8,8 0 0,1 8,-8 z" />
+    <!-- Arms -->
+    <path
+        android:fillColor="#3DDC84"
+        android:pathData="M24,66 a5,5 0 0,0 -5,5 v18 a5,5 0 0,0 10,0 v-18 a5,5 0 0,0 -5,-5 z" />
+    <path
+        android:fillColor="#3DDC84"
+        android:pathData="M84,66 a5,5 0 0,0 -5,5 v18 a5,5 0 0,0 10,0 v-18 a5,5 0 0,0 -5,-5 z" />
+    <!-- Legs -->
+    <path
+        android:fillColor="#3DDC84"
+        android:pathData="M42,92 a5,5 0 0,0 -5,5 v6 a5,5 0 0,0 10,0 v-6 a5,5 0 0,0 -5,-5 z" />
+    <path
+        android:fillColor="#3DDC84"
+        android:pathData="M66,92 a5,5 0 0,0 -5,5 v6 a5,5 0 0,0 10,0 v-6 a5,5 0 0,0 -5,-5 z" />
 </vector>
