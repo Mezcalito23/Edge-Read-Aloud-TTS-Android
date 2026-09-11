@@ -69,7 +69,7 @@
     <string name="test_phrase">Hola. Esta es una prueba del motor Edge Read Aloud. La voz que escuchas se sintetiza en la nube.</string>
     <string name="voice_count_fmt">%1$d voces en catálogo · %2$d es-MX</string>
     <string name="unified_voice_switch">La voz elegida aquí manda en todo el sistema</string>
-    <string name="unified_voice_hint">Activado: todas las apps usan la voz elegida arriba. Desactivado: cada app puede pedir su propio idioma y voz.</string>
+    <string name="unified_voice_hint">Activado: todas las apps usan la voz elegida arriba. Desactivado: las apps usan la voz establecida en el sistema Android no en esta app.</string>
     <string name="catalog_updating">Actualizando catálogo…</string>
     <string name="catalog_updated_fmt">Catálogo actualizado (%1$d voces).</string>
     <string name="catalog_offline">Catálogo no disponible; usando respaldo local es-MX-DaliaNeural.</string>

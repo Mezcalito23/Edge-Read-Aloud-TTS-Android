@@ -72,7 +72,7 @@
     <string name="test_phrase">Hello. This is a test of the Edge Read Aloud engine. The voice you hear is synthesized in the cloud.</string>
     <string name="voice_count_fmt">%1$d voices in catalog · %2$d es-MX</string>
     <string name="unified_voice_switch">The voice chosen here drives the whole system</string>
-    <string name="unified_voice_hint">On: every app uses the voice chosen above. Off: each app may request its own language and voice.</string>
+    <string name="unified_voice_hint">On: every app uses the voice chosen above. Off: apps use the voice set in Android system settings, not in this app.</string>
     <string name="catalog_updating">Refreshing catalog…</string>
     <string name="catalog_updated_fmt">Catalog updated (%1$d voices).</string>
     <string name="catalog_offline">Catalog unavailable; using local fallback es-MX-DaliaNeural.</string>
