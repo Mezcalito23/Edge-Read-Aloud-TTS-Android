@@ -8,8 +8,8 @@ import java.io.ByteArrayOutputStream
  *
  * Play Books manda una frase por [onSynthesizeText]. El punto largo es el
  * silencio de cola de Edge más el de cabeza del turno siguiente.
- * Cola 480 ms: 380 ms aún se oía corrido. Solo se recorta el silencio
- * extra de Edge (~600–800 ms).
+ * Cola 620 ms / cabeza 200 ms: 480 ms seguía oyendo rápido. Solo se
+ * recorta el silencio extra de Edge por encima de ~620 ms.
  */
 class LeadTailClipper(sampleRateHz: Int) {
 
@@ -65,8 +65,8 @@ class LeadTailClipper(sampleRateHz: Int) {
 
     companion object {
         const val AMPLITUDE_THRESHOLD: Int = 480
-        const val KEEP_LEAD_MS: Int = 80
-        const val KEEP_TAIL_MS: Int = 480
+        const val KEEP_LEAD_MS: Int = 200
+        const val KEEP_TAIL_MS: Int = 620
 
         fun samples(ms: Int, sampleRateHz: Int): Int =
             ((sampleRateHz.toLong() * ms) / 1000L).toInt().coerceAtLeast(0)
