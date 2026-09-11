@@ -4,31 +4,25 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Android visor as Pac-Man. No neck, no body. -->
-    <path
-        android:fillColor="#3DDC84"
-        android:pathData="M39,26 m-3.4,0 a3.4,3.4 0 1,1 6.8,0 a3.4,3.4 0 1,1 -6.8,0" />
-    <path
-        android:fillColor="#3DDC84"
-        android:pathData="M69,26 m-3.4,0 a3.4,3.4 0 1,1 6.8,0 a3.4,3.4 0 1,1 -6.8,0" />
-    <path
-        android:pathData="M39,26 L39,38"
-        android:strokeWidth="3"
-        android:strokeColor="#3DDC84"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M69,26 L69,38"
-        android:strokeWidth="3"
-        android:strokeColor="#3DDC84"
-        android:strokeLineCap="round" />
-    <!-- Visor + Pac-Man bite on the right -->
-    <path
-        android:fillColor="#3DDC84"
-        android:pathData="M24,78 L24,50 C24,36 36,32 54,32 C68,32 78,36 82,44 L62,56 L84,70 L84,78 Z" />
-    <path
-        android:fillColor="#0B1F33"
-        android:pathData="M42,52 m-4.2,0 a4.2,4.2 0 1,1 8.4,0 a4.2,4.2 0 1,1 -8.4,0" />
-    <path
-        android:fillColor="#0B1F33"
-        android:pathData="M62,52 m-4.2,0 a4.2,4.2 0 1,1 8.4,0 a4.2,4.2 0 1,1 -8.4,0" />
+    <!-- Official Bugdroid (classic #A4C639), puppet mouth, volume arcs. -->
+    <path android:fillColor="#A4C639" android:pathData="M42,20 m-3,0 a3,3 0 1,1 6,0 a3,3 0 1,1 -6,0" />
+    <path android:fillColor="#A4C639" android:pathData="M66,20 m-3,0 a3,3 0 1,1 6,0 a3,3 0 1,1 -6,0" />
+    <path android:pathData="M42,20 L42,32" android:strokeWidth="2.6" android:strokeColor="#A4C639" android:strokeLineCap="round" />
+    <path android:pathData="M66,20 L66,32" android:strokeWidth="2.6" android:strokeColor="#A4C639" android:strokeLineCap="round" />
+    <path android:fillColor="#A4C639" android:pathData="M32,45 h44 v13 h-44 z" />
+    <path android:fillColor="#A4C639" android:pathData="M32,32 h44 c0,0 0,-0 0,13 v0 c0,13 -10,13 -22,13 c-12,0 -22,0 -22,-13 z" />
+    <path android:fillColor="#A4C639" android:pathData="M45,32 a13,13 0 0,0 -13,13 h13 z" />
+    <path android:fillColor="#A4C639" android:pathData="M63,32 a13,13 0 0,1 13,13 h-13 z" />
+    <path android:fillColor="#A4C639" android:pathData="M32,32 h44 v14 h-44 z" />
+    <path android:fillColor="#0B1F33" android:pathData="M44,44 m-3.3,0 a3.3,3.3 0 1,1 6.6,0 a3.3,3.3 0 1,1 -6.6,0" />
+    <path android:fillColor="#0B1F33" android:pathData="M64,44 m-3.3,0 a3.3,3.3 0 1,1 6.6,0 a3.3,3.3 0 1,1 -6.6,0" />
+    <path android:fillColor="#0B1F33" android:pathData="M54,53.5 m-6,3.5 a6,3.5 0 1,1 12,0 a6,3.5 0 1,1 -12,0" />
+    <path android:fillColor="#A4C639" android:pathData="M34,62 h40 a8,8 0 0,1 8,8 v12 a8,8 0 0,1 -8,8 h-40 a8,8 0 0,1 -8,-8 v-12 a8,8 0 0,1 8,-8 z" />
+    <path android:fillColor="#A4C639" android:pathData="M21,64 h10 a5,5 0 0,1 5,5 v14 a5,5 0 0,1 -5,5 h-10 a5,5 0 0,1 -5,-5 v-14 a5,5 0 0,1 5,-5 z" />
+    <path android:fillColor="#A4C639" android:pathData="M77,64 h10 a5,5 0 0,1 5,5 v14 a5,5 0 0,1 -5,5 h-10 a5,5 0 0,1 -5,-5 v-14 a5,5 0 0,1 5,-5 z" />
+    <path android:fillColor="#A4C639" android:pathData="M39,88 h10 a5,5 0 0,1 5,5 v4 a5,5 0 0,1 -5,5 h-10 a5,5 0 0,1 -5,-5 v-4 a5,5 0 0,1 5,-5 z" />
+    <path android:fillColor="#A4C639" android:pathData="M59,88 h10 a5,5 0 0,1 5,5 v4 a5,5 0 0,1 -5,5 h-10 a5,5 0 0,1 -5,-5 v-4 a5,5 0 0,1 5,-5 z" />
+    <path android:fillColor="#00000000" android:pathData="M80,38 a10,10 0 0,1 0,16" android:strokeWidth="2.4" android:strokeColor="#A4C639" android:strokeLineCap="round" />
+    <path android:fillColor="#00000000" android:pathData="M84,34 a16,16 0 0,1 0,24" android:strokeWidth="2.4" android:strokeColor="#A4C639" android:strokeLineCap="round" />
+    <path android:fillColor="#00000000" android:pathData="M88,30 a22,22 0 0,1 0,32" android:strokeWidth="2.4" android:strokeColor="#A4C639" android:strokeLineCap="round" />
 </vector>
