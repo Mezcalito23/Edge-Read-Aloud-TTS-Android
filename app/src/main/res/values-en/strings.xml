@@ -7,7 +7,7 @@
     <string name="app_byline">by Mezcalito23</string>
     <string name="tts_engine_label">Edge Read Aloud TTS</string>
 
-    <string name="subtitle">Experimental Android TTS engine · initial voice es-MX-DaliaNeural</string>
+    <string name="subtitle">Experimental Android TTS engine · v%1$s</string>
 
     <string name="disclaimer_title">Important notice</string>
     <string name="disclaimer_body">This engine uses an UNOFFICIAL Microsoft Edge Read Aloud protocol that is not published as a stable API: it may change or be blocked at any time. The text you synthesize is sent to remote servers; do not enable the cache if you do not want audio stored locally. The app does not collect accounts, cookies or credentials.</string>

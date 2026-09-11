@@ -4,7 +4,7 @@
     <string name="app_byline">by Mezcalito23</string>
     <string name="tts_engine_label">Edge Read Aloud TTS</string>
 
-    <string name="subtitle">Motor TTS experimental para Android · voz inicial es-MX-DaliaNeural</string>
+    <string name="subtitle">Motor TTS experimental para Android · v%1$s</string>
 
     <string name="disclaimer_title">Aviso importante</string>
     <string name="disclaimer_body">Este motor usa un protocolo NO oficial de Microsoft Edge Read Aloud que no está publicado como API estable: puede cambiar o bloquearse en cualquier momento. El texto que sintetices se envía a servidores remotos; no actives la caché si no quieres conservar audio localmente. La app no recopila cuentas, cookies ni credenciales.</string>

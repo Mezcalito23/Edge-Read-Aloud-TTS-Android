@@ -43,6 +43,8 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        findViewById<TextView>(R.id.subtitle).text =
+            getString(R.string.subtitle, BuildConfig.VERSION_NAME)
         controller = SettingsController(this).apply {
             bind(
                 statusEngine = findViewById(R.id.statusEngine),
