@@ -79,17 +79,7 @@ threads.
    ProGuard keeps the TTS service and engine contract activities.
 
    **Signing:** without a local keystore, release uses the debug key (sideload
-   only). To publish a GitHub APK that can update without uninstalling:
-
-   ```bash
-   keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 2048 \
-     -validity 10000 -alias edge-tts
-   cp keystore.properties.example keystore.properties   # fill passwords
-   ./gradlew assembleRelease
-   ```
-
-   `release.jks` and `keystore.properties` are gitignored. Keep a backup of
-   the JKS off-repo: losing it means users must uninstall to install a new APK.
+   only). Step-by-step (Windows / Android Studio): see [SIGNING.md](SIGNING.md).
 
 
 5. **Instrumented tests** (require a device/emulator with API 26+, no real network):

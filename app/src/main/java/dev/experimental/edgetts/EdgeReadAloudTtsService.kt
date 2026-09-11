@@ -515,6 +515,13 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 }.isSuccess
             } else true
 
+        // ag2s/TTS: Play Books exige start() ANTES de la red; si no, el hueco
+        // entre frases (punto) se come el TLS + el decode entero.
+        if (!ensureStarted(EdgeProtocolConstants.SAMPLE_RATE_HZ)) {
+            guard.error(callback, tr(R.string.error_audio_start))
+            return
+        }
+
         try {
             for (segment in segments) {
                 if (guard.isFired) return
@@ -523,23 +530,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                     return
                 }
 
-                when (val outcome = synthesizeSegment(segment, snap, voice, rate, pitch, metrics)) {
-                    is SegmentOutcome.Ok -> {
-                        if (!ensureStarted(outcome.sampleRateHz)) {
-                            guard.error(callback, tr(R.string.error_audio_start))
-                            return
-                        }
-                        if (!deliver(outcome.pcm, callback)) {
-                            if (stopRequested) {
-                                guard.error(callback, TextToSpeech.STOPPED)
-                            } else {
-                                guard.error(callback, tr(R.string.error_audio_deliver)) { msg ->
-                                    runCatching { settings?.setLastError(msg) }
-                                }
-                            }
-                            return
-                        }
-                    }
+                when (val outcome = synthesizeSegment(segment, snap, voice, rate, pitch, metrics, callback)) {
+                    is SegmentOutcome.Ok -> Unit
 
                     is SegmentOutcome.Failed -> {
                         guard.error(callback, outcome.message) { msg ->
@@ -562,7 +554,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     }
 
     private sealed class SegmentOutcome {
-        class Ok(val pcm: ByteArray, val sampleRateHz: Int) : SegmentOutcome()
+        object Ok : SegmentOutcome()
         class Failed(val message: String) : SegmentOutcome()
         object Cancelled : SegmentOutcome()
     }
@@ -583,7 +575,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         voice: String,
         rate: String,
         pitch: String,
-        metrics: SynthesisMetrics
+        metrics: SynthesisMetrics,
+        callback: SynthesisCallback
     ): SegmentOutcome {
         val format = EdgeProtocolConstants.OUTPUT_FORMAT_MP3
         val locale = LocaleCodes.localeOfVoiceName(voice)
@@ -594,8 +587,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
         if (snap.cacheEnabled && cacheKey != null) {
             cache?.readMp3(cacheKey)?.let { mp3 ->
-                when (val decoded = decodeMp3(mp3, metrics)) {
-                    is SegmentOutcome.Ok -> {
+                when (val decoded = streamMp3(mp3, metrics, callback)) {
+                    SegmentOutcome.Ok -> {
                         metrics.cacheHits++
                         metrics.mp3Bytes += mp3.size
                         return decoded
@@ -607,18 +600,34 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
 
         metrics.cacheMisses++
-        return synthOnce(segment, snap, cacheKey, voice, rate, pitch, format, metrics)
+        return synthOnce(segment, snap, cacheKey, voice, rate, pitch, format, metrics, callback)
     }
 
-    private fun decodeMp3(mp3: ByteArray, metrics: SynthesisMetrics): SegmentOutcome {
+    private fun streamMp3(
+        mp3: ByteArray,
+        metrics: SynthesisMetrics,
+        callback: SynthesisCallback
+    ): SegmentOutcome {
         val t0 = android.os.SystemClock.elapsedRealtime()
-        val decoded = runCatching { mp3Decoder.decode(mp3) }
+        val decoded = runCatching {
+            mp3Decoder.decodeStreaming(mp3) { chunk ->
+                when {
+                    stopRequested -> false
+                    deliver(chunk, callback) -> true
+                    stopRequested -> false
+                    else -> throw AudioDeliverException()
+                }
+            }
+        }
         metrics.decodeMs += android.os.SystemClock.elapsedRealtime() - t0
         return decoded.fold(
-            onSuccess = { SegmentOutcome.Ok(it.pcm, it.sampleRateHz) },
+            onSuccess = { SegmentOutcome.Ok },
             onFailure = {
-                if (it is SynthesisCancelledException) SegmentOutcome.Cancelled
-                else SegmentOutcome.Failed(mapped(it))
+                when (it) {
+                    is SynthesisCancelledException -> SegmentOutcome.Cancelled
+                    is AudioDeliverException -> SegmentOutcome.Failed(tr(R.string.error_audio_deliver))
+                    else -> SegmentOutcome.Failed(mapped(it))
+                }
             }
         )
     }
@@ -632,7 +641,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         rate: String,
         pitch: String,
         outputFormat: String,
-        metrics: SynthesisMetrics
+        metrics: SynthesisMetrics,
+        callback: SynthesisCallback
     ): SegmentOutcome {
         val latch = CountDownLatch(1)
         var failure: Throwable? = null
@@ -698,7 +708,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         }
         metrics.mp3Bytes += mp3.size
 
-        val decoded = decodeMp3(mp3, metrics)
+        val decoded = streamMp3(mp3, metrics, callback)
         if (decoded is SegmentOutcome.Ok && snap.cacheEnabled && cacheKey != null) {
             runCatching { cache?.writeMp3(cacheKey, mp3) }
         }
@@ -766,6 +776,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
     private fun tr(id: Int): String =
         runCatching { getString(id) }.getOrDefault("")
+
+    private class AudioDeliverException : RuntimeException()
 
     companion object {
         private const val TAG = "EdgeTtsService"

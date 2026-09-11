@@ -43,12 +43,28 @@ class Mp3AudioDecoder : AudioDecoder {
     }
 
     override fun decode(compressed: ByteArray): AudioDecoder.DecodeResult =
-        decode(compressed, MAX_INPUT_BYTES, MAX_DECODE_MS)
+        decode(compressed, MAX_INPUT_BYTES, MAX_DECODE_MS, sink = null)
 
     fun decode(
         mp3: ByteArray,
         maxInputBytes: Int,
         deadlineMs: Long
+    ): AudioDecoder.DecodeResult = decode(mp3, maxInputBytes, deadlineMs, sink = null)
+
+    /**
+     * Decodifica y emite PCM por buffer de MediaCodec (como ag2s/TTS).
+     * Play Books empieza a mezclar en el primer [sink]; no espera al MP3 entero.
+     */
+    fun decodeStreaming(
+        mp3: ByteArray,
+        sink: (ByteArray) -> Boolean
+    ): AudioDecoder.DecodeResult = decode(mp3, MAX_INPUT_BYTES, MAX_DECODE_MS, sink)
+
+    fun decode(
+        mp3: ByteArray,
+        maxInputBytes: Int,
+        deadlineMs: Long,
+        sink: ((ByteArray) -> Boolean)?
     ): AudioDecoder.DecodeResult {
         if (cancelled) throw SynthesisCancelledException()
         if (mp3.isEmpty()) throw UnsupportedAudioFormatException("MP3 vacío")
@@ -79,7 +95,7 @@ class Mp3AudioDecoder : AudioDecoder {
             }
             codec.configure(format, null, null, 0)
             codec.start()
-            return runDecode(codec, extractor, format, deadline)
+            return runDecode(codec, extractor, format, deadline, sink)
         } catch (e: SynthesisCancelledException) {
             throw e
         } catch (e: TimeoutException) {
@@ -99,7 +115,8 @@ class Mp3AudioDecoder : AudioDecoder {
         codec: MediaCodec,
         extractor: MediaExtractor,
         format: MediaFormat,
-        deadline: Long
+        deadline: Long,
+        sink: ((ByteArray) -> Boolean)?
     ): AudioDecoder.DecodeResult {
         val pcm = ByteArrayOutputStream(64 * 1024)
         val info = MediaCodec.BufferInfo()
@@ -107,6 +124,8 @@ class Mp3AudioDecoder : AudioDecoder {
         var outputEos = false
         var stagnantAfterEos = 0
         var decodedFrames = 0
+        var channels = formatInt(format, MediaFormat.KEY_CHANNEL_COUNT, 1)
+        var sampleRate = formatInt(format, MediaFormat.KEY_SAMPLE_RATE, 24000)
 
         while (!outputEos) {
             if (cancelled) throw SynthesisCancelledException()
@@ -120,6 +139,9 @@ class Mp3AudioDecoder : AudioDecoder {
             when {
                 outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     stagnantAfterEos = 0
+                    val of = codec.outputFormat
+                    sampleRate = formatInt(of, MediaFormat.KEY_SAMPLE_RATE, sampleRate)
+                    channels = formatInt(of, MediaFormat.KEY_CHANNEL_COUNT, channels)
                 }
                 outIdx >= 0 -> {
                     if (info.size > 0) {
@@ -127,7 +149,15 @@ class Mp3AudioDecoder : AudioDecoder {
                         if (buf != null) {
                             val chunk = ByteArray(info.size)
                             buf.get(chunk)
-                            pcm.write(chunk)
+                            val mono = if (channels >= 2) downmixToMono(chunk, channels) else chunk
+                            if (sink != null) {
+                                if (!sink(mono)) {
+                                    codec.releaseOutputBuffer(outIdx, false)
+                                    throw SynthesisCancelledException()
+                                }
+                            } else {
+                                pcm.write(mono)
+                            }
                             decodedFrames++
                         }
                     }
@@ -147,7 +177,11 @@ class Mp3AudioDecoder : AudioDecoder {
             }
         }
 
-        val result = pcm.toByteArray()
+        val result = if (sink != null) {
+            if (decodedFrames == 0) ByteArray(0) else ByteArray(2)
+        } else {
+            pcm.toByteArray()
+        }
         if (result.isEmpty() || result.size % 2 != 0) {
             throw UnsupportedAudioFormatException(
                 "Audio ausente (frames=$decodedFrames, bytes=${result.size})"
@@ -155,10 +189,13 @@ class Mp3AudioDecoder : AudioDecoder {
         }
 
         val outFormat = codec.outputFormat
-        val sampleRate = formatInt(outFormat, MediaFormat.KEY_SAMPLE_RATE, formatInt(format, MediaFormat.KEY_SAMPLE_RATE, 24000))
-        val channels = formatInt(outFormat, MediaFormat.KEY_CHANNEL_COUNT, formatInt(format, MediaFormat.KEY_CHANNEL_COUNT, 1))
-        val mono = if (channels >= 2) downmixToMono(result, channels) else result
-        return AudioDecoder.DecodeResult(mono, sampleRate, 1)
+        sampleRate = formatInt(outFormat, MediaFormat.KEY_SAMPLE_RATE, sampleRate)
+        channels = formatInt(outFormat, MediaFormat.KEY_CHANNEL_COUNT, channels)
+        return AudioDecoder.DecodeResult(
+            if (sink != null) ByteArray(0) else result,
+            sampleRate,
+            1
+        )
     }
 
     private fun queueInput(codec: MediaCodec, extractor: MediaExtractor): Boolean {
