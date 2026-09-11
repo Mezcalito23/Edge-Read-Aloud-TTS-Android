@@ -1,8 +1,15 @@
+import java.util.Properties
+
 plugins {
     // Kotlin está integrado por AGP 9 (built-in Kotlin).
     // No añadir "org.jetbrains.kotlin.android": el proyecto ya lo resuelve AGP.
     id("com.android.application")
 }
+
+val keystoreProperties: Properties? =
+    rootProject.file("keystore.properties").takeIf { it.isFile }?.inputStream()?.use { stream ->
+        Properties().apply { load(stream) }
+    }
 
 android {
     namespace = "dev.experimental.edgetts"
@@ -22,16 +29,15 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    val keystorePropsFile = rootProject.file("keystore.properties")
-    if (keystorePropsFile.exists()) {
-        val props = java.util.Properties().apply {
-            keystorePropsFile.inputStream().use { load(it) }
-        }
-        signingConfigs.create("release") {
-            storeFile = rootProject.file(props.getProperty("storeFile"))
-            storePassword = props.getProperty("storePassword")
-            keyAlias = props.getProperty("keyAlias")
-            keyPassword = props.getProperty("keyPassword")
+    signingConfigs {
+        val loaded = keystoreProperties
+        if (loaded != null) {
+            create("release") {
+                storeFile = rootProject.file(loaded.getProperty("storeFile"))
+                storePassword = loaded.getProperty("storePassword")
+                keyAlias = loaded.getProperty("keyAlias")
+                keyPassword = loaded.getProperty("keyPassword")
+            }
         }
     }
 
@@ -101,4 +107,3 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
 }
-
