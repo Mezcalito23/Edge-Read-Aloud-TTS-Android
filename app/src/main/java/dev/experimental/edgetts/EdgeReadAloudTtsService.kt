@@ -629,8 +629,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             onSuccess = { SegmentOutcome.Ok },
             onFailure = {
                 when (it) {
-                    is SynthesisCancelledException -> SegmentOutcome.Cancelled
-                    is AudioDeliverException -> SegmentOutcome.Failed(tr(R.string.error_audio_deliver))
+                    is SynthesisCancelledException,
+                    is AudioDeliverException -> SegmentOutcome.Cancelled
                     else -> SegmentOutcome.Failed(mapped(it))
                 }
             }
@@ -781,8 +781,6 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
     private fun tr(id: Int): String =
         runCatching { getString(id) }.getOrDefault("")
-
-    private class AudioDeliverException : RuntimeException()
 
     companion object {
         private const val TAG = "EdgeTtsService"

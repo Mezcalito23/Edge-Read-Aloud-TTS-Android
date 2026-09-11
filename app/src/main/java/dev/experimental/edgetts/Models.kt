@@ -62,6 +62,12 @@ class UnsupportedAudioFormatException(
 class SynthesisCancelledException : Exception("Síntesis cancelada")
 
 /**
+ * Play Books / el sistema dejó de aceptar PCM (frase siguiente, skip, onStop).
+ * El MP3 ya se decodificó; no es un fallo de formato.
+ */
+class AudioDeliverException : Exception("entrega PCM interrumpida")
+
+/**
  * El servidor completó el turno (turn.end) sin enviar audio: suele
  * significar que rechazó el outputFormat o el SSML.
  */
@@ -94,7 +100,7 @@ class SynthesisMetrics {
 object ErrorMapper {
 
     fun spanish(t: Throwable): String = when {
-        t is SynthesisCancelledException ->
+        t is SynthesisCancelledException, t is AudioDeliverException ->
             "Síntesis cancelada por el usuario o por una solicitud nueva."
 
         t is UnsupportedAudioFormatException ->

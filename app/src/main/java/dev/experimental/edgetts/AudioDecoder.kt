@@ -98,6 +98,8 @@ class Mp3AudioDecoder : AudioDecoder {
             return runDecode(codec, extractor, format, deadline, sink)
         } catch (e: SynthesisCancelledException) {
             throw e
+        } catch (e: AudioDeliverException) {
+            throw e
         } catch (e: TimeoutException) {
             throw e
         } catch (e: UnsupportedAudioFormatException) {
