@@ -4,6 +4,7 @@
      Android 13+, via Settings → Apps → Edge Read Aloud TTS → Language. -->
 <resources>
     <string name="app_name">Edge Read Aloud TTS</string>
+    <string name="app_byline">by Mezcalito23</string>
     <string name="tts_engine_label">Edge Read Aloud TTS</string>
 
     <string name="subtitle">Experimental Android TTS engine · initial voice es-MX-DaliaNeural</string>
