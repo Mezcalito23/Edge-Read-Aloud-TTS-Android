@@ -455,6 +455,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val voice = resolveVoice(request, snap)
         val caller = callerKind(request)
         val forceDemo = caller == VoiceResolver.Caller.SettingsUi ||
+            caller == VoiceResolver.Caller.OwnApp ||
             SharedProtocol.isSettingsSample()
         val text = SampleTexts.alignDemo(
             TextSanitizer.removeIncompatibleCharacters(raw),

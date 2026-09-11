@@ -3,18 +3,16 @@ package dev.experimental.edgetts
 import java.util.Locale
 
 /**
- * Muestras del botón «Escuchar ejemplo» de Ajustes. Varios OEM (p. ej. e-ink)
- * mandan el texto en el idioma de la UI (español) aunque la voz sea china
- * o japonesa. [alignDemo] lo corrige en síntesis.
+ * Muestras del botón «Escuchar ejemplo» de Ajustes y de «Probar voz».
+ * Una entrada por idioma del catálogo Edge: [forIso2] nunca cae a inglés
+ * salvo que la voz sea inglesa.
  */
 object SampleTexts {
 
     fun forRequested(languageExtra: String?, countryExtra: String? = null): String {
         val snap = runCatching { SettingsStore.current() }.getOrNull()
         if (snap != null && snap.unifiedVoiceMode && snap.voice.isNotBlank()) {
-            return forIso2(
-                iso2Language(LocaleCodes.localeOfVoiceName(snap.voice).substringBefore('-'))
-            )
+            return forVoice(snap.voice)
         }
         val fromExtra = iso2Language(languageExtra?.substringBefore('-').orEmpty())
         val fromHint = SharedProtocol.lastSampleIso2
@@ -23,12 +21,22 @@ object SampleTexts {
             fromExtra == "es" && fromHint.isNotEmpty() && fromHint != "es" -> fromHint
             fromExtra.isNotEmpty() -> fromExtra
             fromHint.isNotEmpty() -> fromHint
-            else -> iso2Language(countryExtra.orEmpty()).ifEmpty { "en" }
+            else -> iso2Language(countryExtra.orEmpty()).ifEmpty { "es" }
         }
         return forIso2(iso2)
     }
 
-    fun forIso2(iso2: String): String = SAMPLES[iso2] ?: SAMPLES["en"].orEmpty()
+    fun forVoice(voiceName: String): String =
+        forIso2(iso2Language(LocaleCodes.localeOfVoiceName(voiceName).substringBefore('-')))
+
+    fun forIso2(iso2: String): String {
+        val raw = iso2.trim().lowercase(Locale.ROOT).replace('_', '-')
+        val tag = raw.substringBefore('-')
+        SAMPLES[tag]?.let { return it }
+        val mapped = iso2Language(tag)
+        if (mapped.isNotEmpty()) SAMPLES[mapped]?.let { return it }
+        return if (mapped == "en" || tag == "en") SAMPLES.getValue("en") else SAMPLES.getValue("es")
+    }
 
     fun alignDemo(
         text: String,
@@ -57,8 +65,8 @@ object SampleTexts {
         if (raw.isEmpty()) return ""
         val tag = raw.substringBefore('-')
         ALIASES[tag]?.let { return it }
-        if (tag.length == 2) return tag
-        return LocaleCodes.iso3ToIso2LangOrSelf(tag).let { if (it.length == 2) it else "" }
+        if (tag.length == 2 || tag == "yue" || tag == "wuu" || tag == "fil") return tag
+        return LocaleCodes.iso3ToIso2LangOrSelf(tag).let { if (it.length == 2 || it == "yue") it else "" }
     }
 
     private fun looksLikeSettingsDemo(text: String): Boolean {
@@ -75,22 +83,36 @@ object SampleTexts {
 
     private fun scriptLooksNative(text: String, iso2: String): Boolean {
         val block = when (iso2) {
-            "zh", "yue" -> Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+            "zh", "yue", "wuu" -> Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
             "ja" -> Character.UnicodeBlock.HIRAGANA
             "ko" -> Character.UnicodeBlock.HANGUL_SYLLABLES
-            "ar", "fa", "ur" -> Character.UnicodeBlock.ARABIC
+            "ar", "fa", "ur", "ps" -> Character.UnicodeBlock.ARABIC
             "he" -> Character.UnicodeBlock.HEBREW
-            "ru", "uk", "bg", "sr" -> Character.UnicodeBlock.CYRILLIC
+            "ru", "uk", "bg", "sr", "mk", "kk", "mn" -> Character.UnicodeBlock.CYRILLIC
             "hi", "mr", "ne" -> Character.UnicodeBlock.DEVANAGARI
             "th" -> Character.UnicodeBlock.THAI
             "el" -> Character.UnicodeBlock.GREEK
+            "hy" -> Character.UnicodeBlock.ARMENIAN
+            "ka" -> Character.UnicodeBlock.GEORGIAN
+            "am" -> Character.UnicodeBlock.ETHIOPIC
+            "ta" -> Character.UnicodeBlock.TAMIL
+            "te" -> Character.UnicodeBlock.TELUGU
+            "kn" -> Character.UnicodeBlock.KANNADA
+            "ml" -> Character.UnicodeBlock.MALAYALAM
+            "gu" -> Character.UnicodeBlock.GUJARATI
+            "pa" -> Character.UnicodeBlock.GURMUKHI
+            "bn" -> Character.UnicodeBlock.BENGALI
+            "si" -> Character.UnicodeBlock.SINHALA
+            "km" -> Character.UnicodeBlock.KHMER
+            "lo" -> Character.UnicodeBlock.LAO
+            "my" -> Character.UnicodeBlock.MYANMAR
             else -> null
         } ?: return false
         return text.any { Character.UnicodeBlock.of(it) == block }
     }
 
     private val ALIASES = mapOf(
-        "zho" to "zh", "chi" to "zh", "cmn" to "zh", "yue" to "zh",
+        "zho" to "zh", "chi" to "zh", "cmn" to "zh",
         "jpn" to "ja", "kor" to "ko", "fil" to "tl", "tgl" to "tl",
         "heb" to "he", "iw" to "he", "ind" to "id", "in" to "id",
         "ger" to "de", "deu" to "de", "fre" to "fr", "fra" to "fr",
@@ -100,7 +122,8 @@ object SampleTexts {
         "ukr" to "uk", "vie" to "vi", "tha" to "th", "urd" to "ur",
         "fas" to "fa", "per" to "fa", "ron" to "ro", "rum" to "ro",
         "ces" to "cs", "cze" to "cs", "ell" to "el", "gre" to "el",
-        "hun" to "hu", "fin" to "fi", "dan" to "da", "nor" to "nb"
+        "hun" to "hu", "fin" to "fi", "dan" to "da", "nor" to "nb",
+        "yue" to "yue", "wuu" to "wuu"
     )
 
     val SAMPLES: Map<String, String> = mapOf(
@@ -119,10 +142,13 @@ object SampleTexts {
         "ja" to "こんにちは。これは Edge Read Aloud エンジンのテストです。お聞きの声はクラウドで合成されています。",
         "ko" to "안녕하세요. Edge Read Aloud 엔진 테스트입니다. 들리는 음성은 클라우드에서 합성됩니다.",
         "zh" to "你好。这是 Edge Read Aloud 引擎的测试。您听到的语音由云端合成。",
+        "yue" to "你好。呢個係 Edge Read Aloud 引擎嘅測試。你聽到嘅聲音係雲端合成嘅。",
+        "wuu" to "侬好。迭是 Edge Read Aloud 引擎个测试。侬听见个语音是云端合成个。",
         "sv" to "Hej. Detta är ett test av Edge Read Aloud-motorn. Rösten du hör syntetiseras i molnet.",
         "da" to "Hej. Dette er en test af Edge Read Aloud-motoren. Stemmen du hører syntetiseres i skyen.",
         "fi" to "Hei. Tämä on Edge Read Aloud -moottorin testi. Kuulemasi ääni syntetisoidaan pilvessä.",
         "nb" to "Hei. Dette er en test av Edge Read Aloud-motoren. Stemmen du hører syntetiseres i skyen.",
+        "no" to "Hei. Dette er en test av Edge Read Aloud-motoren. Stemmen du hører syntetiseres i skyen.",
         "el" to "Γεια σας. Αυτό είναι ένα τεστ της μηχανής Edge Read Aloud. Η φωνή συντίθεται στο cloud.",
         "cs" to "Ahoj. Toto je test enginu Edge Read Aloud. Hlas, který slyšíte, je syntetizován v cloudu.",
         "ro" to "Bună. Acesta este un test al motorului Edge Read Aloud. Vocea pe care o auziți este sintetizată în cloud.",
@@ -136,6 +162,53 @@ object SampleTexts {
         "fa" to "سلام. این آزمایش موتور Edge Read Aloud است. صدایی که می‌شنوید در ابر ساخته می‌شود.",
         "ur" to "سلام۔ یہ Edge Read Aloud انجن کا ٹیسٹ ہے۔ آواز کلاؤڈ میں ترکیب کی جاتی ہے۔",
         "tl" to "Kumusta. Ito ay isang pagsubok ng Edge Read Aloud engine. Ang boses ay sintesado sa cloud.",
-        "ca" to "Hola. Aquesta és una prova del motor Edge Read Aloud. La veu es sintetitza al núvol."
+        "fil" to "Kumusta. Ito ay isang pagsubok ng Edge Read Aloud engine. Ang boses ay sintesado sa cloud.",
+        "ca" to "Hola. Aquesta és una prova del motor Edge Read Aloud. La veu es sintetitza al núvol.",
+        "af" to "Hallo. Dit is 'n toets van die Edge Read Aloud-enjin. Die stem word in die wolk gesintetiseer.",
+        "am" to "ሰላም። ይህ የ Edge Read Aloud ፈተና ነው። ድምፁ በደመና ውስጥ ተዋህዷል።",
+        "az" to "Salam. Bu, Edge Read Aloud mühərrikinin testidir. Səs buludda sintez olunur.",
+        "bg" to "Здравейте. Това е тест на двигателя Edge Read Aloud. Гласът се синтезира в облака.",
+        "bn" to "হ্যালো। এটি Edge Read Aloud ইঞ্জিনের একটি পরীক্ষা। কণ্ঠস্বর ক্লাউডে সংশ্লেষিত হয়।",
+        "bs" to "Zdravo. Ovo je test Edge Read Aloud motora. Glas se sintetiše u oblaku.",
+        "cy" to "Helo. Mae hon yn brawf o'r peiriant Edge Read Aloud. Mae'r llais yn cael ei syntheseiddio yn y cwmwl.",
+        "et" to "Tere. See on Edge Read Aloudi mootori test. Hääl sünteesitakse pilves.",
+        "eu" to "Kaixo. Hau Edge Read Aloud motorraren proba bat da. Ahotsa hodeian sintetizatzen da.",
+        "ga" to "Dia duit. Is tástáil é seo ar inneall Edge Read Aloud. Déantar an ghuth a shintéisiú sa scamall.",
+        "gl" to "Ola. Esta é unha proba do motor Edge Read Aloud. A voz sintetízase na nube.",
+        "gu" to "નમસ્તે. આ Edge Read Aloud એન્જિનની કસોટી છે. અવાજ ક્લાઉડમાં સંશ્લેષિત થાય છે.",
+        "hr" to "Bok. Ovo je test Edge Read Aloud motora. Glas se sintetizira u oblaku.",
+        "hy" to "Բարև։ Սա Edge Read Aloud շարժիչի թեստ է։ Ձայնը սինթեզվում է ամպում։",
+        "is" to "Halló. Þetta er prófun á Edge Read Aloud vélinni. Röddin er mynduð í skýinu.",
+        "iu" to "ᐊᐃ. ᐅᓇ Edge Read Aloud ᖃᕆᑕᐅᔭᕆᐊᖃᕐᑐᖅ. ᓂᐱ ᓄᓇᕐᔪᐊᒥ ᓴᖅᑭᑦᑎᔪᖅ.",
+        "jv" to "Halo. Iki minangka tes mesin Edge Read Aloud. Swara kasebut disintesis ing cloud.",
+        "ka" to "გამარჯობა. ეს არის Edge Read Aloud ძრავის ტესტი. ხმა სინთეზდება ღრუბელში.",
+        "kk" to "Сәлеметсіз бе. Бұл Edge Read Aloud қозғалтқышының сынағы. Дауыс бұлтта синтезделеді.",
+        "km" to "សួស្តី។ នេះគឺជាការសាកល្បងម៉ាស៊ីន Edge Read Aloud។ សំឡេងត្រូវបានសំយោគនៅក្នុងពពក។",
+        "kn" to "ನಮಸ್ಕಾರ. ಇದು Edge Read Aloud ಎಂಜಿನ್‌ನ ಪರೀಕ್ಷೆಯಾಗಿದೆ. ಧ್ವನಿಯು ಕ್ಲೌಡ್‌ನಲ್ಲಿ ಸಂಶ್ಲೇಷಿಸಲ್ಪಟ್ಟಿದೆ.",
+        "lo" to "ສະບາຍດີ. ນີ້ແມ່ນການທົດສອບເຄື່ອງຈັກ Edge Read Aloud. ສຽງຖືກສັງເຄາະໃນຄລາວ.",
+        "lt" to "Sveiki. Tai yra Edge Read Aloud variklio testas. Balsas sintetinamas debesyje.",
+        "lv" to "Sveiki. Šis ir Edge Read Aloud motora tests. Balss tiek sintezēta mākonī.",
+        "mk" to "Здраво. Ова е тест на Edge Read Aloud моторот. Гласот се синтетизира во облакот.",
+        "ml" to "ഹലോ. ഇത് Edge Read Aloud എഞ്ചിന്റെ പരീക്ഷണമാണ്. ശബ്ദം ക്ലൗഡിൽ സംശ്ലേഷണം ചെയ്യപ്പെടുന്നു.",
+        "mn" to "Сайн байна уу. Энэ бол Edge Read Aloud хөдөлгүүрийн тест юм. Дуу нь үүлэнд нийлэгждэг.",
+        "mr" to "नमस्कार. हे Edge Read Aloud इंजिनचे परीक्षण आहे. आवाज क्लाउडमध्ये संश्लेषित केला जातो.",
+        "mt" to "Bongu. Dan huwa test tal-mutur Edge Read Aloud. Il-vuċi hija sintetizzata fis-sħaba.",
+        "my" to "မင်္ဂလာပါ။ ဒါက Edge Read Aloud အင်ဂျင်ရဲ့ စမ်းသပ်မှုဖြစ်ပါတယ်။ အသံကို cloud မှာ ပေါင်းစပ်ထားပါတယ်။",
+        "ne" to "नमस्ते। यो Edge Read Aloud इन्जिनको परीक्षण हो। आवाज क्लाउडमा संश्लेषित गरिएको छ।",
+        "or" to "ନମସ୍କାର। ଏହା Edge Read Aloud ଇଞ୍ଜିନର ଏକ ପରୀକ୍ଷା। ସ୍ୱର କ୍ଲାଉଡରେ ସଂଶ୍ଳେଷିତ ହୁଏ।",
+        "pa" to "ਸਤ ਸ੍ਰੀ ਅਕਾਲ। ਇਹ Edge Read Aloud ਇੰਜਣ ਦੀ ਇੱਕ ਪਰਖ ਹੈ। ਆਵਾਜ਼ ਕਲਾਉਡ ਵਿੱਚ ਸੰਸਲੇਸ਼ਿਤ ਹੁੰਦੀ ਹੈ।",
+        "ps" to "سلام. دا د Edge Read Aloud انجن ازموینه ده. غږ په کلاوډ کې ترکیب شوی دی.",
+        "si" to "ආයුබෝවන්. මෙය Edge Read Aloud එන්ජිමේ පරීක්ෂාවකි. හඬ වලාකුළේ සංශ්ලේෂණය වේ.",
+        "sk" to "Ahoj. Toto je test motora Edge Read Aloud. Hlas je syntetizovaný v cloude.",
+        "sl" to "Pozdravljeni. To je test motorja Edge Read Aloud. Glas je sintetiziran v oblaku.",
+        "so" to "Salaan. Tani waa tijaabada mishiinka Edge Read Aloud. Codka waxaa lagu sameeyaa daruurga.",
+        "sq" to "Përshëndetje. Ky është një test i motorit Edge Read Aloud. Zëri sintetizohet në re.",
+        "sr" to "Здраво. Ово је тест Edge Read Aloud мотора. Глас се синтетише у облаку.",
+        "su" to "Halo. Ieu mangrupikeun tés mesin Edge Read Aloud. Sora disintésis dina cloud.",
+        "sw" to "Habari. Hii ni jaribio la injini ya Edge Read Aloud. Sauti inasintesiwa kwenye wingu.",
+        "ta" to "வணக்கம். இது Edge Read Aloud இயந்திரத்தின் சோதனை. குரல் கிளவுட்டில் தொகுக்கப்படுகிறது.",
+        "te" to "నమస్కారం. ఇది Edge Read Aloud ఇంజన్ యొక్క పరీక్ష. వాయిస్ క్లౌడ్‌లో సంశ్లేషణ చేయబడింది.",
+        "uz" to "Salom. Bu Edge Read Aloud dvigatelining sinovidir. Ovoz bulutda sintez qilinadi.",
+        "zu" to "Sawubona. Lokhu ukuhlolwa kwenjini ye-Edge Read Aloud. Izwi lakhiwe efwini."
     )
 }

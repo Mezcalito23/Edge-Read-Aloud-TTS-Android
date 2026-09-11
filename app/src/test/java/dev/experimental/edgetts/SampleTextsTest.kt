@@ -46,4 +46,21 @@ class SampleTextsTest {
         )
         assertTrue(out.contains("こんにちは"))
     }
+
+    @Test
+    fun unknownLanguageDoesNotFallBackToEnglish() {
+        val bg = SampleTexts.forIso2("bg")
+        assertTrue(bg.contains("Здравейте") || bg.contains("тест"))
+        assertFalse(bg.startsWith("Hello."))
+        val yue = SampleTexts.forVoice("yue-CN-XiaoMinNeural")
+        assertFalse(yue.startsWith("Hello."))
+        val missing = SampleTexts.forIso2("xx")
+        assertFalse(missing.startsWith("Hello."))
+        assertTrue(missing.startsWith("Hola."))
+    }
+
+    @Test
+    fun bulgarianSampleIsCyrillicNotEnglish() {
+        assertEquals(SampleTexts.SAMPLES.getValue("bg"), SampleTexts.forIso2("bul"))
+    }
 }

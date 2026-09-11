@@ -49,7 +49,6 @@ android {
         abortOnError = true
         checkReleaseBuilds = true
         disable += setOf(
-            "MissingApplicationIcon",
             "IconMissingDensityFolder",
             "GradleDependency",
             "AndroidGradlePluginVersion"

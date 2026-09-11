@@ -71,11 +71,18 @@ object SsmlBuilder {
         text: String,
         minimal: Boolean = false
     ): String = buildString {
-        append("<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>")
+        append("<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis'")
+        if (!minimal) append(" xmlns:mstts='http://www.w3.org/2001/mstts'")
+        append(" xml:lang='en-US'>")
         append("<voice name='").append(escapeXml(voiceLongName(voice))).append("'>")
         if (minimal) {
             append(escapeXml(text))
         } else {
+            // Pausas tipo motor local: *-exact sustituye la pausa neural larga.
+            append("<mstts:silence type='Leading-exact' value='0ms'/>")
+            append("<mstts:silence type='Tailing-exact' value='40ms'/>")
+            append("<mstts:silence type='comma-exact' value='80ms'/>")
+            append("<mstts:silence type='Sentenceboundary-exact' value='220ms'/>")
             append("<prosody pitch='").append(escapeXml(pitch))
             append("' rate='").append(escapeXml(rate))
             append("' volume='+0%'>")

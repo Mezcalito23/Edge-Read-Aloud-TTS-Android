@@ -59,7 +59,7 @@ class SettingsStore(context: Context) {
                 userAgent = EdgeProtocolConstants.DEFAULT_USER_AGENT,
                 origin = EdgeProtocolConstants.DEFAULT_ORIGIN,
                 uiLanguage = "",
-                unifiedVoiceMode = false,
+                unifiedVoiceMode = true,
                 lastSpanishVoice = EdgeProtocolConstants.DEFAULT_VOICE,
                 lastError = "",
                 handshakeDebug = "",
@@ -125,7 +125,7 @@ class SettingsStore(context: Context) {
     fun setUnifiedVoiceMode(enabled: Boolean) =
         applyAndPersist({ it.copy(unifiedVoiceMode = enabled) }) {
             it[K_UNIFIED_VOICE] = enabled
-            it[K_VOICE_POLICY] = 2
+            it[K_VOICE_POLICY] = 3
         }
 
     fun setLastSpanishVoice(voice: String) =
@@ -219,8 +219,8 @@ class SettingsStore(context: Context) {
                 prefs[K_ORIGIN] ?: EdgeProtocolConstants.DEFAULT_ORIGIN
             ),
             uiLanguage = prefs[K_UI_LANG].orEmpty(),
-            unifiedVoiceMode = if ((prefs[K_VOICE_POLICY] ?: 0) < 2) false
-                else (prefs[K_UNIFIED_VOICE] ?: false),
+            unifiedVoiceMode = if ((prefs[K_VOICE_POLICY] ?: 0) < 3) true
+                else (prefs[K_UNIFIED_VOICE] ?: true),
             lastSpanishVoice = prefs[K_LAST_ES_VOICE] ?: EdgeProtocolConstants.DEFAULT_VOICE,
             lastError = prefs[K_LAST_ERROR].orEmpty(),
             handshakeDebug = prefs[K_HS_DEBUG].orEmpty(),
