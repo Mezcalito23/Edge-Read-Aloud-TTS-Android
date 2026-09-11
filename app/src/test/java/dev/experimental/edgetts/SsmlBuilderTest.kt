@@ -71,7 +71,7 @@ class SsmlBuilderTest {
         )
         assertTrue(
             ssml.startsWith(
-                "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='http://www.w3.org/2001/mstts' xml:lang='en-US'>"
+                "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>"
             )
         )
         // La referencia envía el nombre LARGO (verificado con mkssml en vivo).
@@ -80,8 +80,7 @@ class SsmlBuilderTest {
                 "<voice name='Microsoft Server Speech Text to Speech Voice (es-MX, DaliaNeural)'>"
             )
         )
-        assertTrue(ssml.contains("type='comma-exact'"))
-        assertTrue(ssml.contains("type='Sentenceboundary-exact'"))
+        assertFalse(ssml.contains("mstts"))
         assertTrue(
             ssml.contains("<prosody pitch='+0Hz' rate='+0%' volume='+0%'>Hola</prosody>")
         )

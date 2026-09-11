@@ -48,15 +48,23 @@ class SampleTextsTest {
     }
 
     @Test
+    fun everyBuiltinCatalogLanguageHasANativeSample() {
+        val missing = LanguageAvailability.BUILTIN.map {
+            it.substringBefore('-').lowercase()
+        }.distinct().sorted().filter { lang ->
+            SampleTexts.SAMPLES[lang] == null &&
+                SampleTexts.SAMPLES[SampleTexts.iso2Language(lang)] == null
+        }
+        assertEquals("idiomas del catálogo sin muestra: $missing", emptyList<String>(), missing)
+    }
+
+    @Test
     fun unknownLanguageDoesNotFallBackToEnglish() {
         val bg = SampleTexts.forIso2("bg")
         assertTrue(bg.contains("Здравейте") || bg.contains("тест"))
         assertFalse(bg.startsWith("Hello."))
         val yue = SampleTexts.forVoice("yue-CN-XiaoMinNeural")
         assertFalse(yue.startsWith("Hello."))
-        val missing = SampleTexts.forIso2("xx")
-        assertFalse(missing.startsWith("Hello."))
-        assertTrue(missing.startsWith("Hola."))
     }
 
     @Test

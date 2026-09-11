@@ -10,8 +10,11 @@ build/
 # Kotlin
 .kotlin/
 
-# Local SDK configuration
-local.properties
+# Release signing — never commit the real keystore or passwords
+*.jks
+*.keystore
+keystore.properties
+
 
 # Build outputs
 *.apk

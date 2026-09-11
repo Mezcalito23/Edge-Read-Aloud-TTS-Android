@@ -76,10 +76,21 @@ threads.
    ./gradlew assembleRelease
    ```
 
-   ProGuard keeps the TTS service and engine contract activities. The release
-   build is signed with the debug key so you can `installRelease` locally;
-   replace `signingConfig` before any store upload. After installing, verify
-   that Settings still lists the engine, the catalog loads, and synthesis works.
+   ProGuard keeps the TTS service and engine contract activities.
+
+   **Signing:** without a local keystore, release uses the debug key (sideload
+   only). To publish a GitHub APK that can update without uninstalling:
+
+   ```bash
+   keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 2048 \
+     -validity 10000 -alias edge-tts
+   cp keystore.properties.example keystore.properties   # fill passwords
+   ./gradlew assembleRelease
+   ```
+
+   `release.jks` and `keystore.properties` are gitignored. Keep a backup of
+   the JKS off-repo: losing it means users must uninstall to install a new APK.
+
 
 5. **Instrumented tests** (require a device/emulator with API 26+, no real network):
 

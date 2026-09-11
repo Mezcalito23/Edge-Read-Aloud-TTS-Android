@@ -35,7 +35,7 @@ object SampleTexts {
         SAMPLES[tag]?.let { return it }
         val mapped = iso2Language(tag)
         if (mapped.isNotEmpty()) SAMPLES[mapped]?.let { return it }
-        return if (mapped == "en" || tag == "en") SAMPLES.getValue("en") else SAMPLES.getValue("es")
+        error("Muestra ausente para idioma '$iso2'")
     }
 
     fun alignDemo(

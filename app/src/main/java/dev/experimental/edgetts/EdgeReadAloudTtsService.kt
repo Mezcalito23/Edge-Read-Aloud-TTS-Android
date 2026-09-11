@@ -615,7 +615,10 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val decoded = runCatching { mp3Decoder.decode(mp3) }
         metrics.decodeMs += android.os.SystemClock.elapsedRealtime() - t0
         return decoded.fold(
-            onSuccess = { SegmentOutcome.Ok(it.pcm, it.sampleRateHz) },
+            onSuccess = {
+                val pcm = SilenceTrimmer.trim(it.pcm, it.sampleRateHz)
+                SegmentOutcome.Ok(pcm, it.sampleRateHz)
+            },
             onFailure = {
                 if (it is SynthesisCancelledException) SegmentOutcome.Cancelled
                 else SegmentOutcome.Failed(mapped(it))
