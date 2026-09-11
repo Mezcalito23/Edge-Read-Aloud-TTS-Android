@@ -17,6 +17,25 @@ wire captures.
 > only, indexed by its SHA-256 hash. The app does not read Edge accounts,
 > cookies or credentials, and never prints tokens to Logcat.
 
+### Sentence pauses (original vs current)
+
+Play Books sends **one sentence per** `onSynthesizeText`. Edge then adds
+end-of-turn padding (~600–800 ms of silence) on top of the period. Stacked
+with the next request, the period felt like a hole. Neo Reader sends longer
+chunks, so commas/periods stay **inside** the MP3 and already sounded natural.
+
+| | Original (long period) | Current |
+|---|---|---|
+| Speaking rate / pitch | Unchanged (`+0%` / `+0Hz` unless the user moves the sliders) | Same |
+| Commas (inside a paragraph) | Edge’s own pause | Untouched |
+| Period in Play Books | ~600–800 ms tail + lead of the next turn + network | True silence only, **~40 ms lead / ~520 ms tail** (in-paragraph Edge period) |
+| Period in Neo | Edge internal pause | Same; only the end of the paragraph is clipped |
+| Words | Full phonemes | Same (amplitude threshold **80**, not 480 — a high threshold ate word onsets and made Play Books sound rushed) |
+
+rany2/edge-tts does **not** trim audio or inject `<break>` / `mstts:silence`.
+The clip (`LeadTailClipper`) is PCM-only, after MP3 decode, and does not
+change the cache (still MP3).
+
 ---
 
 ## Requirements
@@ -76,10 +95,11 @@ threads.
    ./gradlew assembleRelease
    ```
 
-   ProGuard keeps the TTS service and engine contract activities. The release
-   build is signed with the debug key so you can `installRelease` locally;
-   replace `signingConfig` before any store upload. After installing, verify
-   that Settings still lists the engine, the catalog loads, and synthesis works.
+   ProGuard keeps the TTS service and engine contract activities.
+
+   **Signing:** without a local keystore, release uses the debug key (sideload
+   only). Step-by-step (Windows / Android Studio): see [SIGNING.md](SIGNING.md).
+
 
 5. **Instrumented tests** (require a device/emulator with API 26+, no real network):
 

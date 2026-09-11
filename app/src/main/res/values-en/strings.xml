@@ -4,6 +4,7 @@
      Android 13+, via Settings → Apps → Edge Read Aloud TTS → Language. -->
 <resources>
     <string name="app_name">Edge Read Aloud TTS</string>
+    <string name="app_byline">by Mezcalito23</string>
     <string name="tts_engine_label">Edge Read Aloud TTS</string>
 
     <string name="subtitle">Experimental Android TTS engine · initial voice es-MX-DaliaNeural</string>
@@ -32,7 +33,7 @@
     <string name="label_pitch">Pitch</string>
     <string name="hint_rate" formatted="false">Slide from -50% to +50% · the middle (0) is the normal rate of the voice</string>
     <string name="hint_pitch" formatted="false">Slide from -50Hz to +50Hz · the middle (0) is the normal pitch of the voice</string>
-    <string name="params_persist_hint">These settings are saved on exit and respected by every app that uses this engine (Play Books, Neo Reader…).</string>
+    <string name="params_persist_hint">These settings are saved on exit and respected by every app that uses this engine.</string>
 
     <!-- Actions -->
     <string name="action_test">Test voice</string>
@@ -71,7 +72,7 @@
     <string name="test_phrase">Hello. This is a test of the Edge Read Aloud engine. The voice you hear is synthesized in the cloud.</string>
     <string name="voice_count_fmt">%1$d voices in catalog · %2$d es-MX</string>
     <string name="unified_voice_switch">The voice chosen here drives the whole system</string>
-    <string name="unified_voice_hint">On: Neo, Play Books and the Settings sample always use the voice and language chosen above, even if the book is in another language. Off: Android Settings → Text-to-speech wins (Spain sounds like Spain, British English like British). Book text is not translated; only the voice changes.</string>
+    <string name="unified_voice_hint">On: every app uses the voice chosen above. Off: each app may request its own language and voice.</string>
     <string name="catalog_updating">Refreshing catalog…</string>
     <string name="catalog_updated_fmt">Catalog updated (%1$d voices).</string>
     <string name="catalog_offline">Catalog unavailable; using local fallback es-MX-DaliaNeural.</string>

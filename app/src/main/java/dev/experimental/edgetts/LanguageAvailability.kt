@@ -62,10 +62,11 @@ object LanguageAvailability {
         es-CO es-CR es-CU es-DO es-EC es-ES es-GQ es-GT es-HN es-MX es-NI es-PA
         es-PE es-PR es-PY es-SV es-US es-UY es-VE et-EE eu-ES fa-IR fi-FI fil-PH
         fr-BE fr-CA fr-CH fr-FR ga-IE gl-ES gu-IN he-IL hi-IN hr-HR hu-HU id-ID
-        is-IS it-IT ja-JP jv-ID ka-GE kk-KZ km-KH kn-IN ko-KR lo-LA lt-LT lv-LV
-        mk-MK ml-IN mn-MN mr-IN ms-MY mt-MT my-MM nb-NO ne-NP nl-BE nl-NL pl-PL
-        ps-AF pt-BR pt-PT ro-RO ru-RU si-LK sk-SK sl-SI so-SO sq-AL sr-RS su-ID
-        sv-SE sw-KE sw-TZ ta-IN ta-LK ta-MY ta-SG te-IN th-TH tr-TR uk-UA ur-IN
-        ur-PK uz-UZ vi-VN yue-CN zh-CN zh-HK zh-TW zu-ZA
+        is-IS it-IT iu-Cans-CA iu-Latn-CA ja-JP jv-ID ka-GE kk-KZ km-KH kn-IN ko-KR
+        lo-LA lt-LT lv-LV mk-MK ml-IN mn-MN mr-IN ms-MY mt-MT my-MM nb-NO ne-NP
+        nl-BE nl-NL or-IN pa-IN pl-PL ps-AF pt-BR pt-PT ro-RO ru-RU si-LK sk-SK
+        sl-SI so-SO sq-AL sr-RS su-ID sv-SE sw-KE sw-TZ ta-IN ta-LK ta-MY ta-SG
+        te-IN th-TH tr-TR uk-UA ur-IN ur-PK uz-UZ vi-VN wuu-CN yue-CN zh-CN zh-HK
+        zh-TW zu-ZA
     """.trim().split(Regex("\\s+"))
 }

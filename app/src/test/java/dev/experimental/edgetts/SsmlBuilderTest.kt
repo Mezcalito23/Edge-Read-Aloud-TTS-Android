@@ -80,6 +80,7 @@ class SsmlBuilderTest {
                 "<voice name='Microsoft Server Speech Text to Speech Voice (es-MX, DaliaNeural)'>"
             )
         )
+        assertFalse(ssml.contains("mstts"))
         assertTrue(
             ssml.contains("<prosody pitch='+0Hz' rate='+0%' volume='+0%'>Hola</prosody>")
         )
@@ -110,6 +111,7 @@ class SsmlBuilderTest {
             minimal = true
         )
         assertFalse(ssml.contains("prosody"))
+        assertFalse(ssml.contains("mstts"))
         assertTrue(
             ssml.contains(
                 "<voice name='Microsoft Server Speech Text to Speech Voice (es-MX, DaliaNeural)'>Hola</voice>"

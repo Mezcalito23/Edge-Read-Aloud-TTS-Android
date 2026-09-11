@@ -393,7 +393,7 @@ class SettingsController(private val activity: Activity) {
 
         // Locale de la voz elegida (p. ej. "es-MX-DaliaNeural" → es-MX).
         val voiceLocale = localeOfVoice(snap.voice)
-        val sample = sampleTextFor(voiceLocale.language)
+        val sample = SampleTexts.forVoice(snap.voice)
 
         ttsClient = TextToSpeech(
             activity.applicationContext,
@@ -767,91 +767,10 @@ class SettingsController(private val activity: Activity) {
     }
 
     /**
-     * Texto de ejemplo en el idioma de la voz seleccionada. Cubre la práctica
-     * totalidad de los idiomas del catálogo Edge (~75) para que la prueba
-     * suene SIEMPRE en el idioma de la voz, nunca en inglés por defecto. Los
-     * pocos idiomas sin muestra propia caen en inglés (último recurso).
+     * Texto de ejemplo en el idioma de la voz. Delegado a [SampleTexts]
+     * para no duplicar el mapa ni caer a inglés.
      */
-    private fun sampleTextFor(language: String): String =
-        when (language.lowercase(Locale.ROOT)) {
-            "es" -> "Hola. Esta es una prueba del motor Edge Read Aloud. La voz que escuchas se sintetiza en la nube."
-            "en" -> "Hello. This is a test of the Edge Read Aloud engine. The voice you hear is synthesized in the cloud."
-            "fr" -> "Bonjour. Ceci est un test du moteur Edge Read Aloud. La voix que vous entendez est synthétisée dans le cloud."
-            "de" -> "Hallo. Dies ist ein Test der Edge Read Aloud-Engine. Die Stimme wird in der Cloud synthetisiert."
-            "it" -> "Ciao. Questo è un test del motore Edge Read Aloud. La voce che senti è sintetizzata nel cloud."
-            "pt" -> "Olá. Este é um teste do motor Edge Read Aloud. A voz que você ouve é sintetizada na nuvem."
-            "nl" -> "Hallo. Dit is een test van de Edge Read Aloud-engine. De stem wordt in de cloud gesynthetiseerd."
-            "ru" -> "Привет. Это тест движка Edge Read Aloud. Голос синтезируется в облаке."
-            "pl" -> "Cześć. To jest test silnika Edge Read Aloud. Głos jest syntezowany w chmurze."
-            "tr" -> "Merhaba. Bu, Edge Read Aloud motorunun bir testidir. Ses bulutta sentezlenmektedir."
-            "ar" -> "مرحباً. هذا اختبار لمحرك Edge Read Aloud. يتم توليف الصوت في السحابة."
-            "hi" -> "नमस्ते। यह Edge Read Aloud इंजन का परीक्षण है। आवाज़ क्लाउड में संश्लेषित की जाती है।"
-            "ja" -> "こんにちは。これは Edge Read Aloud エンジンのテストです。音声はクラウドで合成されています。"
-            "ko" -> "안녕하세요. Edge Read Aloud 엔진 테스트입니다. 음성은 클라우드에서 합성됩니다."
-            "zh" -> "你好。这是 Edge Read Aloud 引擎的测试。语音由云端合成。"
-            // ── Resto de idiomas del catálogo Edge ──────────────────────
-            "af" -> "Hallo. Dit is 'n toets van die Edge Read Aloud-enjin. Die stem word in die wolk gesintetiseer."
-            "am" -> "ሰላም። ይህ የ Edge Read Aloud ፈተና ነው። ድምፁ በደመና ውስጥ ተዋህዷል።"
-            "az" -> "Salam. Bu, Edge Read Aloud mühərrikinin testidir. Səs buludda sintez olunur."
-            "bg" -> "Здравейте. Това е тест на двигателя Edge Read Aloud. Гласът се синтезира в облака."
-            "bn" -> "হ্যালো। এটি Edge Read Aloud ইঞ্জিনের একটি পরীক্ষা। কণ্ঠস্বর ক্লাউডে সংশ্লেষিত হয়।"
-            "bs" -> "Zdravo. Ovo je test Edge Read Aloud motora. Glas se sintetiše u oblaku."
-            "ca" -> "Hola. Aquesta és una prova del motor Edge Read Aloud. La veu se sintetitza al núvol."
-            "cs" -> "Ahoj. Toto je test motoru Edge Read Aloud. Hlas je syntetizován v cloudu."
-            "cy" -> "Helo. Mae hon yn brawf o'r peiriant Edge Read Aloud. Mae'r llais yn cael ei syntheseiddio yn y cwmwl."
-            "da" -> "Hej. Dette er en test af Edge Read Aloud-motoren. Stemmen syntetiseres i skyen."
-            "el" -> "Γεια σας. Αυτή είναι μια δοκιμή της μηχανής Edge Read Aloud. Η φωνή συντίθεται στο cloud."
-            "et" -> "Tere. See on Edge Read Aloudi mootori test. Hääl sünteesitakse pilves."
-            "eu" -> "Kaixo. Hau Edge Read Aloud motorraren proba bat da. Ahotsa hodeian sintetizatzen da."
-            "fa" -> "سلام. این آزمایشی برای موتور Edge Read Aloud است. صدا در فضای ابری ترکیب می‌شود."
-            "fi" -> "Hei. Tämä on Edge Read Aloud -moottorin testi. Ääni syntetisoidaan pilvessä."
-            "fil", "tl" -> "Kumusta. Ito ay isang pagsubok ng Edge Read Aloud engine. Ang boses ay naka-synthesize sa cloud."
-            "ga" -> "Dia duit. Is tástáil é seo ar inneall Edge Read Aloud. Déantar an ghuth a shintéisiú sa scamall."
-            "gl" -> "Ola. Esta é unha proba do motor Edge Read Aloud. A voz sintetízase na nube."
-            "gu" -> "નમસ્તે. આ Edge Read Aloud એન્જિનની કસોટી છે. અવાજ ક્લાઉડમાં સંશ્લેષિત થાય છે."
-            "he" -> "שלום. זהו מבחן של מנוע Edge Read Aloud. הקול מיוצר בענן."
-            "hr" -> "Bok. Ovo je test Edge Read Aloud motora. Glas se sintetizira u oblaku."
-            "hu" -> "Szia. Ez az Edge Read Aloud motor tesztje. A hang a felhőben van szintetizálva."
-            "hy" -> "Բարև։ Սա Edge Read Aloud շարժիչի թեստ է։ Ձայնը սինթեզվում է ամպում։"
-            "id" -> "Halo. Ini adalah uji mesin Edge Read Aloud. Suara disintesis di cloud."
-            "is" -> "Halló. Þetta er prófun á Edge Read Aloud vélinni. Röddin er mynduð í skýinu."
-            "jv" -> "Halo. Iki minangka tes mesin Edge Read Aloud. Swara kasebut disintesis ing cloud."
-            "ka" -> "გამარჯობა. ეს არის Edge Read Aloud ძრავის ტესტი. ხმა სინთეზდება ღრუბელში."
-            "kk" -> "Сәлеметсіз бе. Бұл Edge Read Aloud қозғалтқышының сынағы. Дауыс бұлтта синтезделеді."
-            "km" -> "សួស្តី។ នេះគឺជាការសាកល្បងម៉ាស៊ីន Edge Read Aloud។ សំឡេងត្រូវបានសំយោគនៅក្នុងពពក។"
-            "kn" -> "ನಮಸ್ಕಾರ. ಇದು Edge Read Aloud ಎಂಜಿನ್‌ನ ಪರೀಕ್ಷೆಯಾಗಿದೆ. ಧ್ವನಿಯು ಕ್ಲೌಡ್‌ನಲ್ಲಿ ಸಂಶ್ಲೇಷಿಸಲ್ಪಟ್ಟಿದೆ."
-            "lo" -> "ສະບາຍດີ. ນີ້ແມ່ນການທົດສອບເຄື່ອງຈັກ Edge Read Aloud. ສຽງຖືກສັງເຄາະໃນຄລາວ."
-            "lt" -> "Sveiki. Tai yra Edge Read Aloud variklio testas. Balsas sintetinamas debesyje."
-            "lv" -> "Sveiki. Šis ir Edge Read Aloud motora tests. Balss tiek sintezēta mākonī."
-            "mk" -> "Здраво. Ова е тест на Edge Read Aloud моторот. Гласот се синтетизира во облакот."
-            "ml" -> "ഹലോ. ഇത് Edge Read Aloud എഞ്ചിന്റെ പരീക്ഷണമാണ്. ശബ്ദം ക്ലൗഡിൽ സംശ്ലേഷണം ചെയ്യപ്പെടുന്നു."
-            "mn" -> "Сайн байна уу. Энэ бол Edge Read Aloud хөдөлгүүрийн тест юм. Дуу нь үүлэнд нийлэгждэг."
-            "mr" -> "नमस्कार. हे Edge Read Aloud इंजिनचे परीक्षण आहे. आवाज क्लाउडमध्ये संश्लेषित केला जातो."
-            "ms" -> "Helo. Ini adalah ujian enjin Edge Read Aloud. Suara disintesis dalam cloud."
-            "mt" -> "Bongu. Dan huwa test tal-mutur Edge Read Aloud. Il-vuċi hija sintetizzata fis-sħaba."
-            "my" -> "မင်္ဂလာပါ။ ဒါက Edge Read Aloud အင်ဂျင်ရဲ့ စမ်းသပ်မှုဖြစ်ပါတယ်။ အသံကို cloud မှာ ပေါင်းစပ်ထားပါတယ်။"
-            "nb", "no" -> "Hei. Dette er en test av Edge Read Aloud-motoren. Stemmen syntetiseres i skyen."
-            "ne" -> "नमस्ते। यो Edge Read Aloud इन्जिनको परीक्षण हो। आवाज क्लाउडमा संश्लेषित गरिएको छ।"
-            "ps" -> "سلام. دا د Edge Read Aloud انجن ازموینه ده. غږ په کلاوډ کې ترکیب شوی دی."
-            "ro" -> "Bună. Acesta este un test al motorului Edge Read Aloud. Vocea este sintetizată în cloud."
-            "si" -> "ආයුබෝවන්. මෙය Edge Read Aloud එන්ජිමේ පරීක්ෂාවකි. හඬ වලාකුළේ සංශ්ලේෂණය වේ."
-            "sk" -> "Ahoj. Toto je test motora Edge Read Aloud. Hlas je syntetizovaný v cloude."
-            "sl" -> "Pozdravljeni. To je test motorja Edge Read Aloud. Glas je sintetiziran v oblaku."
-            "sq" -> "Përshëndetje. Ky është një test i motorit Edge Read Aloud. Zëri sintetizohet në re."
-            "sr" -> "Здраво. Ово је тест Edge Read Aloud мотора. Глас се синтетише у облаку."
-            "su" -> "Halo. Ieu mangrupikeun tés mesin Edge Read Aloud. Sora disintésis dina cloud."
-            "sv" -> "Hej. Detta är ett test av Edge Read Aloud-motorn. Rösten syntetiseras i molnet."
-            "sw" -> "Habari. Hii ni jaribio la injini ya Edge Read Aloud. Sauti inasintesiwa kwenye wingu."
-            "ta" -> "வணக்கம். இது Edge Read Aloud இயந்திரத்தின் சோதனை. குரல் கிளவுட்டில் தொகுக்கப்படுகிறது."
-            "te" -> "నమస్కారం. ఇది Edge Read Aloud ఇంజన్ యొక్క పరీక్ష. వాయిస్ క్లౌడ్‌లో సంశ్లేషణ చేయబడింది."
-            "th" -> "สวัสดี นี่คือการทดสอบเอ็นจิน Edge Read Aloud เสียงถูกสังเคราะห์ในคลาวด์"
-            "uk" -> "Привіт. Це тест рушія Edge Read Aloud. Голос синтезується в хмарі."
-            "ur" -> "سلام۔ یہ Edge Read Aloud انجن کا ٹیسٹ ہے۔ آواز کلاؤڈ میں ترکیب کی جاتی ہے۔"
-            "uz" -> "Salom. Bu Edge Read Aloud dvigatelining sinovidir. Ovoz bulutda sintez qilinadi."
-            "vi" -> "Xin chào. Đây là bài kiểm tra của công cụ Edge Read Aloud. Giọng nói được tổng hợp trên đám mây."
-            "zu" -> "Sawubona. Lokhu ukuhlolwa kwenjini ye-Edge Read Aloud. Izwi lakhiwe efwini."
-            else -> "Hello. This is a test of the Edge Read Aloud engine. The voice you hear is synthesized in the cloud."
-        }
+    private fun sampleTextFor(language: String): String = SampleTexts.forIso2(language)
 
     /**
      * Devuelve velocidad y tono a sus valores normales (0 = centro del slider),

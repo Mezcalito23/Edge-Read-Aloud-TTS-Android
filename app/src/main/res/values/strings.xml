@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Edge Read Aloud TTS</string>
+    <string name="app_byline">by Mezcalito23</string>
     <string name="tts_engine_label">Edge Read Aloud TTS</string>
 
     <string name="subtitle">Motor TTS experimental para Android · voz inicial es-MX-DaliaNeural</string>
@@ -29,7 +30,7 @@
     <string name="label_pitch">Tono</string>
     <string name="hint_rate" formatted="false">Desliza de -50% a +50% · el centro (0) es la velocidad normal de la voz</string>
     <string name="hint_pitch" formatted="false">Desliza de -50Hz a +50Hz · el centro (0) es el tono normal de la voz</string>
-    <string name="params_persist_hint">Estos ajustes se guardan al salir y los respetan todas las apps que usen este motor (Play Books, Neo Reader…).</string>
+    <string name="params_persist_hint">Estos ajustes se guardan al salir y los respetan todas las apps que usen este motor.</string>
 
     <!-- Acciones -->
     <string name="action_test">Probar voz</string>
@@ -68,7 +69,7 @@
     <string name="test_phrase">Hola. Esta es una prueba del motor Edge Read Aloud. La voz que escuchas se sintetiza en la nube.</string>
     <string name="voice_count_fmt">%1$d voces en catálogo · %2$d es-MX</string>
     <string name="unified_voice_switch">La voz elegida aquí manda en todo el sistema</string>
-    <string name="unified_voice_hint">Activado: Neo, Play Books y el ejemplo de Ajustes usan siempre la voz y el idioma de arriba, aunque el libro esté en otro idioma. Desactivado: mandan la voz y el idioma de Ajustes → Texto a voz (España suena España, inglés británico suena británico). El texto largo de un libro no se traduce; solo cambia la voz.</string>
+    <string name="unified_voice_hint">Activado: todas las apps usan la voz elegida arriba. Desactivado: cada app puede pedir su propio idioma y voz.</string>
     <string name="catalog_updating">Actualizando catálogo…</string>
     <string name="catalog_updated_fmt">Catálogo actualizado (%1$d voces).</string>
     <string name="catalog_offline">Catálogo no disponible; usando respaldo local es-MX-DaliaNeural.</string>
