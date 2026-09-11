@@ -610,14 +610,19 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     ): SegmentOutcome {
         val t0 = android.os.SystemClock.elapsedRealtime()
         val decoded = runCatching {
-            mp3Decoder.decodeStreaming(mp3) { chunk ->
-                when {
-                    stopRequested -> false
-                    deliver(chunk, callback) -> true
-                    stopRequested -> false
-                    else -> throw AudioDeliverException()
-                }
+            val clip = LeadTailClipper(EdgeProtocolConstants.SAMPLE_RATE_HZ)
+            fun out(chunk: ByteArray): Boolean = when {
+                stopRequested -> false
+                deliver(chunk, callback) -> true
+                stopRequested -> false
+                else -> throw AudioDeliverException()
             }
+            val result = mp3Decoder.decodeStreaming(mp3) { raw -> clip.push(raw, ::out) }
+            if (!clip.finish(::out)) {
+                if (stopRequested) throw SynthesisCancelledException()
+                throw AudioDeliverException()
+            }
+            result
         }
         metrics.decodeMs += android.os.SystemClock.elapsedRealtime() - t0
         return decoded.fold(
