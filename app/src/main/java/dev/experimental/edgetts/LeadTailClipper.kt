@@ -3,13 +3,16 @@ package dev.experimental.edgetts
 import java.io.ByteArrayOutputStream
 
 /**
- * Recorta silencio de cabeza y de cola de un turno PCM. Las pausas internas
- * (comas) se dejan tal cual: recortarlas aceleró Neo.
+ * Recorta silencio **verdadero** de cabeza y cola de un turno PCM.
  *
- * Play Books manda una frase por [onSynthesizeText]. El punto largo es el
- * silencio de cola de Edge más el de cabeza del turno siguiente.
- * Cola 620 ms / cabeza 200 ms: 480 ms seguía oyendo rápido. Solo se
- * recorta el silencio extra de Edge por encima de ~620 ms.
+ * rany2/edge-tts no altera el audio: pausas = las que Edge mete en el SSML.
+ * Neo manda párrafos, así que comas/puntos van **dentro** del MP3 y se oyen
+ * naturales. Play Books manda una frase por [onSynthesizeText]: el punto es
+ * cola de un turno + cabeza del siguiente, y Edge añade ~600–800 ms de
+ * padding de fin de síntesis.
+ *
+ * Umbral bajo (80): un umbral de 480 se comía el ataque/coda de cada frase
+ * de Play Books y aceleraba la lectura. Las pausas internas no se tocan.
  */
 class LeadTailClipper(sampleRateHz: Int) {
 
@@ -64,9 +67,11 @@ class LeadTailClipper(sampleRateHz: Int) {
     }
 
     companion object {
-        const val AMPLITUDE_THRESHOLD: Int = 480
-        const val KEEP_LEAD_MS: Int = 200
-        const val KEEP_TAIL_MS: Int = 620
+        /** Casi silencio digital. 480 recortaba fonemas suaves. */
+        const val AMPLITUDE_THRESHOLD: Int = 80
+        const val KEEP_LEAD_MS: Int = 40
+        /** Pausa de punto de Edge dentro de un párrafo (Neo). */
+        const val KEEP_TAIL_MS: Int = 520
 
         fun samples(ms: Int, sampleRateHz: Int): Int =
             ((sampleRateHz.toLong() * ms) / 1000L).toInt().coerceAtLeast(0)

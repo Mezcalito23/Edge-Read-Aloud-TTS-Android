@@ -39,6 +39,27 @@ class LeadTailClipperTest {
 
     private fun silence(ms: Int) = ByteArray(samples(ms) * 2)
 
+    @Test
+    fun quietSpeechIsNotTreatedAsSilence() {
+        val pcm = concat(silence(300), quietTone(150), silence(300))
+        val out = run(pcm)
+        val speech = samples(150) * 2
+        assertTrue("quiet speech must survive: out=${out.size}", out.size >= speech)
+    }
+
+    private fun quietTone(ms: Int): ByteArray {
+        val n = samples(ms)
+        val b = ByteArray(n * 2)
+        var i = 0
+        while (i < n) {
+            val v = if (i % 2 == 0) 200 else -200
+            b[i * 2] = (v and 0xFF).toByte()
+            b[i * 2 + 1] = ((v shr 8) and 0xFF).toByte()
+            i++
+        }
+        return b
+    }
+
     private fun tone(ms: Int): ByteArray {
         val n = samples(ms)
         val b = ByteArray(n * 2)
