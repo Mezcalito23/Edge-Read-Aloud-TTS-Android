@@ -100,7 +100,7 @@ class SynthesisMetrics {
 object ErrorMapper {
 
     fun spanish(t: Throwable): String = when {
-        t is SynthesisCancelledException, t is AudioDeliverException ->
+        t is SynthesisCancelledException || t is AudioDeliverException ->
             "Síntesis cancelada por el usuario o por una solicitud nueva."
 
         t is UnsupportedAudioFormatException ->
@@ -127,7 +127,7 @@ object ErrorMapper {
     }
 
     fun localize(ctx: android.content.Context, t: Throwable): String = when {
-        t is SynthesisCancelledException ->
+        t is SynthesisCancelledException || t is AudioDeliverException ->
             ctx.getString(R.string.error_cancelled)
         t is UnsupportedAudioFormatException ->
             ctx.getString(
