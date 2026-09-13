@@ -47,6 +47,15 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
     private val synthesisLock = Any()
 
+    @Volatile
+    private var lastTurnAt = 0L
+    @Volatile
+    private var lastTurnChars = -1
+    @Volatile
+    private var lastTurnHash = 0
+    @Volatile
+    private var sessionTurn = 0
+
     // Idioma cargado por el cliente (setLanguage). Se inicializa con el
     // idioma del SISTEMA para que el TTS por defecto siga al dispositivo
     // (inglés en un equipo inglés, francés en uno francés, etc.) — como
@@ -503,6 +512,18 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         val started = AtomicBoolean(false)
         val metrics = SynthesisMetrics()
         metrics.segments = segments.size
+        var result = "ok"
+        val now = android.os.SystemClock.elapsedRealtime()
+        val gap = if (lastTurnAt == 0L) -1L else now - lastTurnAt
+        val sessionStart = gap < 0L || gap > 4_000L
+        if (sessionStart) sessionTurn = 1 else sessionTurn++
+        val dup = !sessionStart &&
+            text.length == lastTurnChars &&
+            text.hashCode() == lastTurnHash &&
+            gap in 0L..250L
+        lastTurnAt = now
+        lastTurnChars = text.length
+        lastTurnHash = text.hashCode()
 
         fun ensureStarted(rate: Int): Boolean =
             if (started.compareAndSet(false, true)) {
@@ -526,6 +547,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             for (segment in segments) {
                 if (guard.isFired) return
                 if (stopRequested) {
+                    result = "cancel"
                     guard.error(callback, TextToSpeech.STOPPED)
                     return
                 }
@@ -534,6 +556,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                     is SegmentOutcome.Ok -> Unit
 
                     is SegmentOutcome.Failed -> {
+                        result = "fail"
                         guard.error(callback, outcome.message) { msg ->
                             runCatching { settings?.setLastError(msg) }
                         }
@@ -541,6 +564,7 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                     }
 
                     SegmentOutcome.Cancelled -> {
+                        result = "cancel"
                         guard.error(callback, TextToSpeech.STOPPED)
                         return
                     }
@@ -549,7 +573,26 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
 
             if (!guard.isFired) guard.done(callback)
         } finally {
-            runCatching { settings?.setLastMetrics(metrics.line()) }
+            val persist = when {
+                metrics.persistHits > 0 && metrics.persistMisses == 0 -> "hit"
+                metrics.persistMisses > 0 && metrics.persistHits == 0 -> "miss"
+                metrics.persistHits + metrics.persistMisses == 0 -> "n/a"
+                else -> "mix"
+            }
+            val cacheKind = when {
+                metrics.cacheHits > 0 && metrics.cacheMisses == 0 -> "hit"
+                metrics.cacheMisses > 0 && metrics.cacheHits == 0 -> "miss"
+                metrics.cacheHits + metrics.cacheMisses == 0 -> "n/a"
+                else -> "mix"
+            }
+            val gapLabel = if (gap < 0L) "-" else "${gap}ms"
+            val turn =
+                "TURN n=$sessionTurn gap=$gapLabel chars=${text.length} segs=${metrics.segments} " +
+                    "caller=$caller dup=$dup burst=${gap in 0L..800L} sessionStart=$sessionStart " +
+                    "result=$result clipLead=${metrics.clipLeadMs}ms clipTail=${metrics.clipTailMs}ms " +
+                    "persist=$persist cache=$cacheKind rate=${request.speechRate}"
+            AppLog.i(TAG) { turn }
+            runCatching { settings?.setLastMetrics("$turn · ${metrics.line()}") }
         }
     }
 
@@ -609,8 +652,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         callback: SynthesisCallback
     ): SegmentOutcome {
         val t0 = android.os.SystemClock.elapsedRealtime()
+        val clip = LeadTailClipper(EdgeProtocolConstants.SAMPLE_RATE_HZ)
         val decoded = runCatching {
-            val clip = LeadTailClipper(EdgeProtocolConstants.SAMPLE_RATE_HZ)
             fun out(chunk: ByteArray): Boolean = when {
                 stopRequested -> false
                 deliver(chunk, callback) -> true
@@ -624,6 +667,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
             }
             result
         }
+        metrics.clipLeadMs += clip.leadDropMs
+        metrics.clipTailMs += clip.tailDropMs
         metrics.decodeMs += android.os.SystemClock.elapsedRealtime() - t0
         return decoded.fold(
             onSuccess = { SegmentOutcome.Ok },

@@ -14,12 +14,17 @@ import java.io.ByteArrayOutputStream
  * Umbral bajo (80): un umbral de 480 se comía el ataque/coda de cada frase
  * de Play Books y aceleraba la lectura. Las pausas internas no se tocan.
  */
-class LeadTailClipper(sampleRateHz: Int) {
+class LeadTailClipper(private val sampleRateHz: Int) {
 
     private val keepLead = samples(KEEP_LEAD_MS, sampleRateHz) * 2
     private val keepTail = samples(KEEP_TAIL_MS, sampleRateHz) * 2
     private var heardVoice = false
     private val held = ByteArrayOutputStream(8 * 1024)
+
+    var leadDropMs: Int = 0
+        private set
+    var tailDropMs: Int = 0
+        private set
 
     fun push(chunk: ByteArray, emit: (ByteArray) -> Boolean): Boolean {
         if (chunk.size < 2) return true
@@ -32,7 +37,9 @@ class LeadTailClipper(sampleRateHz: Int) {
                     i += 2
                 } else {
                     heardVoice = true
-                    val lead = tailBytes(held.toByteArray(), keepLead)
+                    val raw = held.toByteArray()
+                    val lead = tailBytes(raw, keepLead)
+                    leadDropMs = msOf(raw.size - lead.size)
                     held.reset()
                     if (lead.isNotEmpty() && !emit(lead)) return false
                 }
@@ -55,9 +62,16 @@ class LeadTailClipper(sampleRateHz: Int) {
     }
 
     fun finish(emit: (ByteArray) -> Boolean): Boolean {
-        val tail = tailBytes(held.toByteArray(), keepTail)
+        val raw = held.toByteArray()
+        val tail = tailBytes(raw, keepTail)
+        tailDropMs = msOf(raw.size - tail.size)
         held.reset()
         return tail.isEmpty() || emit(tail)
+    }
+
+    private fun msOf(bytes: Int): Int {
+        if (bytes <= 0 || sampleRateHz <= 0) return 0
+        return ((bytes / 2) * 1000) / sampleRateHz
     }
 
     private fun runTo(chunk: ByteArray, start: Int, silent: Boolean): Int {

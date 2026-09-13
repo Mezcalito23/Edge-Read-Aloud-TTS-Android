@@ -12,13 +12,19 @@ class LeadTailClipperTest {
     @Test
     fun leadingAndTrailingAreClippedInternalPauseKept() {
         val pcm = concat(silence(400), tone(80), silence(200), tone(80), silence(400))
-        val out = run(pcm)
+        val clip = LeadTailClipper(sr)
+        val acc = ByteArrayOutputStream()
+        assertTrue(clip.push(pcm) { b -> acc.write(b); true })
+        assertTrue(clip.finish { b -> acc.write(b); true })
+        val out = acc.toByteArray()
         val internal = samples(200) * 2
         assertTrue("internal pause must survive: out=${out.size}", out.size > internal)
         val max =
             samples(LeadTailClipper.KEEP_LEAD_MS + 80 + 200 + 80 + LeadTailClipper.KEEP_TAIL_MS) * 2 + 64
         assertTrue("out=${out.size} max=$max", out.size <= max)
         assertTrue(out.size < pcm.size)
+        assertTrue("lead should drop some padding: ${clip.leadDropMs}", clip.leadDropMs > 0)
+        assertTrue("tail should drop some padding: ${clip.tailDropMs}", clip.tailDropMs > 0)
     }
 
     @Test
