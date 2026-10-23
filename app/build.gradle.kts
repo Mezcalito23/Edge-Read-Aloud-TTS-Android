@@ -13,7 +13,9 @@ val keystoreProperties: Properties? =
 
 android {
     namespace = "dev.experimental.edgetts"
-    compileSdk = 36
+    // OkHttp 5.5 (okhttp-android) declara minCompileSdk=37. targetSdk sigue
+    // en 36: no cambia el comportamiento en el dispositivo.
+    compileSdk = 37
 
     buildFeatures {
         buildConfig = true
