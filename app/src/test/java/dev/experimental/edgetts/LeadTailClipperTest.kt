@@ -11,7 +11,7 @@ class LeadTailClipperTest {
 
     @Test
     fun leadingAndTrailingAreClippedInternalPauseKept() {
-        val pcm = concat(silence(400), tone(80), silence(200), tone(80), silence(400))
+        val pcm = concat(silence(400), tone(80), silence(200), tone(80), silence(800))
         val clip = LeadTailClipper(sr)
         val acc = ByteArrayOutputStream()
         assertTrue(clip.push(pcm) { b -> acc.write(b); true })
