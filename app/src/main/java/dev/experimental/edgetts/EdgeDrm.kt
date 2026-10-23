@@ -34,7 +34,7 @@ class EdgeDrm(private val state: ProtocolState) {
     ): String {
         val gec = generateSecMsGec(unixSeconds, trustedClientToken)
         return baseUrl +
-            "?TrustedClientToken=" + trustedClientToken +
+            "?Ocp-Apim-Subscription-Key=" + trustedClientToken +
             "&ConnectionId=" + connectionId +
             "&Sec-MS-GEC=" + gec +
             "&Sec-MS-GEC-Version=" + secMsGecVersion

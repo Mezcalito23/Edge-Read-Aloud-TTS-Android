@@ -211,7 +211,7 @@ class SettingsStore(context: Context) {
             pitchHz = prefs[K_PITCH] ?: 0,
             cacheEnabled = prefs[K_CACHE] ?: true,
             voicesUrl = prefs[K_VOICES_URL] ?: EdgeProtocolConstants.VOICES_LIST_URL,
-            wsUrl = prefs[K_WS_URL] ?: EdgeProtocolConstants.WS_BASE_URL,
+            wsUrl = EdgeProtocolConstants.currentWsUrl(prefs[K_WS_URL]),
             userAgent = HeaderPolicy.orDefaultUserAgent(
                 prefs[K_USER_AGENT] ?: EdgeProtocolConstants.DEFAULT_USER_AGENT
             ),

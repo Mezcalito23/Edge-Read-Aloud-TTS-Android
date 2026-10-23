@@ -97,8 +97,10 @@ backend by implementing `TtsProvider`.
 
 ## Protocol (rany2-compatible)
 
-- Endpoint `speech.platform.bing.com/.../readaloud/edge/v1`
-- `TrustedClientToken` (public unofficial value), `Sec-MS-GEC` (v2 digest of
+- Synthesis `wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1`
+  (the old `speech.platform.bing.com/.../edge/v1` host returns 403 since October 2026)
+- Voice list still on `speech.platform.bing.com/.../voices/list`
+- `Ocp-Apim-Subscription-Key` (same public unofficial token), `Sec-MS-GEC` (v2 digest of
   5-minute Windows FILETIME ticks + token, `16 hex`-`64 hex`), `Sec-MS-GEC-Version=2-143.0.3650.75`
 - Desktop Edge User-Agent, Origin `chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold`,
   cookie `muid=`

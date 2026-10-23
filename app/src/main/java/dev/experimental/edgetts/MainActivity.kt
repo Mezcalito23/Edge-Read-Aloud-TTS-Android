@@ -594,7 +594,7 @@ class SettingsController(private val activity: Activity) {
             append(activity.getString(R.string.ep_ws)).append("    : ")
                 .append(mask(snap.wsUrl))
                 .append(
-                    "?TrustedClientToken=••••&ConnectionId=<uuid>&Sec-MS-GEC=<sha-256>&" +
+                    "?Ocp-Apim-Subscription-Key=••••&ConnectionId=<uuid>&Sec-MS-GEC=<v2>&" +
                         "Sec-MS-GEC-Version=" + EdgeProtocolConstants.CLIENT_VERSION
                 ).append('\n')
             append(activity.getString(R.string.ep_origin)).append(": ")

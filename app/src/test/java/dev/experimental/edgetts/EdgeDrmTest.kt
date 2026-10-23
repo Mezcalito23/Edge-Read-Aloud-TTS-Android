@@ -163,7 +163,7 @@ class EdgeDrmTest {
         val query = url.substringAfter('?')
         val keys = query.split('&').map { it.substringBefore('=') }
         assertEquals(
-            listOf("TrustedClientToken", "ConnectionId", "Sec-MS-GEC", "Sec-MS-GEC-Version"),
+            listOf("Ocp-Apim-Subscription-Key", "ConnectionId", "Sec-MS-GEC", "Sec-MS-GEC-Version"),
             keys
         )
     }
