@@ -70,11 +70,6 @@ Edge Read Aloud TTS, and the in-app subtitle).
 | [rany2/edge-tts](https://github.com/rany2/edge-tts) 7.3.1 | WebSocket URL, `TrustedClientToken`, Sec-MS-GEC **v2** (`16 hex`-`64 hex`), `Sec-MS-GEC-Version=2-143.0.3650.75`, SSML, Edge headers, 403 clock skew from `Date` | One new socket per chunk (we keep the socket open) |
 | [ag2s20150909/TTS](https://github.com/ag2s20150909/TTS) | System `TextToSpeechService`, `callback.start()` before the request, streaming MP3→PCM so Play Books highlights while audio arrives | Static voice table, in-app pronunciation dictionary, speaking styles, foreground-service notification |
 
-Two later forks of ag2s were read and not merged:
-
-- [zhanshrd/TTS](https://github.com/zhanshrd/TTS) (0.3.0, Sep 2026) still uses the **v1** SHA-256 token. Its useful fixes (correct `Edg/` user-agent, 403 clock skew, bundled voice list, MP3 cache) are already in this app, and newer: live catalog, v2 token, persistent socket.
-- [EoP2/TTS](https://github.com/EoP2/TTS) (Jul 2026) drops the Microsoft socket and requires a private HTTP proxy. Direct synthesis works here, so that proxy is not used.
-
 ## Enable the engine
 
 1. Settings → System → Text-to-speech (or Languages & input).

@@ -52,7 +52,7 @@
 
     <!-- Cache -->
     <string name="cache_switch">Store synthesized audio on this device</string>
-    <string name="cache_note">Not required for the app to work correctly. It only helps apps that can rewind the audio by 15 or 30 seconds. Max 100 MB.</string>
+    <string name="cache_note">Not required for the app to work correctly. It rewinds the audio without sending the text to the cloud again. Max 100 MB.</string>
     <string name="cache_used_fmt">Used: %1$s of %2$s</string>
     <string name="cache_freed_fmt">Cache cleared (%1$s freed).</string>
 

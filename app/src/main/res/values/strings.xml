@@ -49,7 +49,7 @@
 
     <!-- Caché -->
     <string name="cache_switch">Guardar audio sintetizado en este dispositivo</string>
-    <string name="cache_note">No es necesaria para el correcto funcionamiento de la app. Solo sirve para las apps que pueden regresar el audio 15 o 30 segundos. Máx. 100 MB.</string>
+    <string name="cache_note">No es necesaria para el correcto funcionamiento de la app. Sirve para hacer regresar el audio sin que se vuelva a enviar el texto a la nube. Máx. 100 MB.</string>
     <string name="cache_used_fmt">Ocupada: %1$s de %2$s</string>
     <string name="cache_freed_fmt">Caché borrada (%1$s liberados).</string>
 
