@@ -7,7 +7,7 @@ package dev.experimental.edgetts
  * controlada cuando eso ocurra.
  *
  * Los marcados [VERIFICADO] provienen del cliente de referencia rany2/edge-tts
- * 7.2.8 y de capturas del wire real.
+ * 7.3.1 y de capturas del wire real.
  */
 object EdgeProtocolConstants {
 
@@ -22,11 +22,10 @@ object EdgeProtocolConstants {
         "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1"
 
     /**
-     * [VERIFICADO] Versión de cliente para Sec-MS-GEC-Version. Debe
-     * coincidir con la build que el servidor reconoce (constants.py de
-     * edge-tts: 143.0.3650.75). Configurable desde la app sin recompilar.
+     * [VERIFICADO] Versión de cliente para Sec-MS-GEC-Version. rany2 7.3.1
+     * usa el prefijo 2- (token v2) con la build 143.0.3650.75.
      */
-    const val CLIENT_VERSION: String = "1-143.0.3650.75"
+    const val CLIENT_VERSION: String = "2-143.0.3650.75"
 
     /**
      * [VERIFICADO] Origin del lector inmersivo de Edge, que es quien consume

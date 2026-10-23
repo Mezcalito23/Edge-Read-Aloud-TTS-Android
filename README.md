@@ -98,8 +98,8 @@ backend by implementing `TtsProvider`.
 ## Protocol (rany2-compatible)
 
 - Endpoint `speech.platform.bing.com/.../readaloud/edge/v1`
-- `TrustedClientToken` (public unofficial value), `Sec-MS-GEC` (SHA-256 of
-  5-minute Windows FILETIME ticks + token), `Sec-MS-GEC-Version=1-143.0.3650.75`
+- `TrustedClientToken` (public unofficial value), `Sec-MS-GEC` (v2 digest of
+  5-minute Windows FILETIME ticks + token, `16 hex`-`64 hex`), `Sec-MS-GEC-Version=2-143.0.3650.75`
 - Desktop Edge User-Agent, Origin `chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold`,
   cookie `muid=`
 - Output format `audio-24khz-48kbitrate-mono-mp3` → PCM 16-bit 24 kHz mono

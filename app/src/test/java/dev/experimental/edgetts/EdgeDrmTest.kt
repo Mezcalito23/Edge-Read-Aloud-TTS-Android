@@ -11,7 +11,8 @@ class EdgeDrmTest {
 
     private val token = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
     private val unix = 1_735_689_600L // 2025-01-01 00:00:00 UTC, divisible by 300
-    private val knownGec = "B0EDD22C7C09868E2F24C10264A8A3EB877773A7B6040B68AFA4FBCBABEA0238"
+    private val knownGec =
+        "54404AFE67C9B44A-E72E51D8B4F5F75E9A96B7E20D7877227455BC310433BD30C817CD54A1D9313E"
 
     @Test
     fun generateSecMsGecMatchesKnownVector() {
@@ -21,10 +22,10 @@ class EdgeDrmTest {
     }
 
     @Test
-    fun generateSecMsGecIsUppercaseHex64() {
+    fun generateSecMsGecIsV2Shape() {
         val gec = EdgeDrm.generateSecMsGec(unix, token)
-        assertEquals(64, gec.length)
-        assertTrue(gec.matches(Regex("[0-9A-F]{64}")))
+        assertEquals(81, gec.length)
+        assertTrue(gec.matches(Regex("[0-9A-F]{16}-[0-9A-F]{64}")))
         assertEquals(gec, gec.uppercase(Locale.US))
     }
 
@@ -42,8 +43,8 @@ class EdgeDrmTest {
         val drm = EdgeDrm(ProtocolState())
         val a = drm.websocketUrl("wss://example", "cid", token, "1-99-0", unix)
         val b = drm.websocketUrl("wss://example", "cid", token, "1-00-0", unix)
-        val gec = Regex("Sec-MS-GEC=([0-9A-F]+)").find(a)!!.groupValues[1]
-        assertEquals(gec, Regex("Sec-MS-GEC=([0-9A-F]+)").find(b)!!.groupValues[1])
+        val gec = Regex("Sec-MS-GEC=([0-9A-F-]+)").find(a)!!.groupValues[1]
+        assertEquals(gec, Regex("Sec-MS-GEC=([0-9A-F-]+)").find(b)!!.groupValues[1])
         assertTrue(a.contains("Sec-MS-GEC-Version=1-99-0"))
         assertTrue(b.contains("Sec-MS-GEC-Version=1-00-0"))
     }

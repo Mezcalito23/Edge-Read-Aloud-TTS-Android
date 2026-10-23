@@ -194,9 +194,8 @@ class ProtocolParsingTest {
 
     @Test
     fun verifiedProtocolConstantsMatchTheReferenceClient() {
-        // VERIFICADO contra constants.py de rany2/edge-tts 7.2.8: si estos
-        // valores cambian aquí, hay que comprobarlos contra la referencia.
-        assertEquals("1-143.0.3650.75", EdgeProtocolConstants.CLIENT_VERSION)
+        // VERIFICADO contra constants.py de rany2/edge-tts 7.3.1.
+        assertEquals("2-143.0.3650.75", EdgeProtocolConstants.CLIENT_VERSION)
         assertEquals(
             "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold",
             EdgeProtocolConstants.DEFAULT_ORIGIN
@@ -261,7 +260,7 @@ class ProtocolParsingTest {
         val token = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
         val unix = 1_735_689_600L // 2025-01-01 00:00:00 UTC, divisible by 300
         assertEquals(
-            "B0EDD22C7C09868E2F24C10264A8A3EB877773A7B6040B68AFA4FBCBABEA0238",
+            "54404AFE67C9B44A-E72E51D8B4F5F75E9A96B7E20D7877227455BC310433BD30C817CD54A1D9313E",
             EdgeDrm.generateSecMsGec(unix, token)
         )
         assertEquals(
@@ -278,9 +277,9 @@ class ProtocolParsingTest {
         val a = EdgeProtocolClient.generateSecMsGec(base, token)
         val b = EdgeProtocolClient.generateSecMsGec(base + 299, token)
         assertEquals(a, b)
-        // Formato: 64 caracteres hexadecimales en MAYÚSCULAS.
-        assertEquals(64, a.length)
-        assertTrue(Regex("^[0-9A-F]{64}$").matches(a))
+        // Formato v2: 16 hex, guion, 64 hex.
+        assertEquals(81, a.length)
+        assertTrue(Regex("^[0-9A-F]{16}-[0-9A-F]{64}$").matches(a))
     }
 
     @Test

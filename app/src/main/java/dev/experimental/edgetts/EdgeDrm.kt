@@ -1,6 +1,5 @@
 package dev.experimental.edgetts
 
-import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -10,7 +9,7 @@ import java.util.UUID
 /**
  * Único dueño de TrustedClientToken, Sec-MS-GEC, MUID, cookie, cabeceras
  * de handshake y timestamps FILETIME/JS. El catálogo y el WebSocket
- * reutilizan esta clase; la fórmula GEC no se altera.
+ * reutilizan esta clase. El token es el Sec-MS-GEC v2 de rany2 7.3.1.
  */
 class EdgeDrm(private val state: ProtocolState) {
 
@@ -102,8 +101,6 @@ class EdgeDrm(private val state: ProtocolState) {
     }
 
     companion object {
-        private const val WIN_EPOCH_SECONDS: Long = 11_644_473_600L
-        private const val TICKS_PER_SECOND: Long = 10_000_000L
 
         private val JS_STAMP = ThreadLocal.withInitial {
             SimpleDateFormat(
@@ -122,16 +119,8 @@ class EdgeDrm(private val state: ProtocolState) {
             }
         }
 
-        fun generateSecMsGec(unixSeconds: Long, trustedClientToken: String): String {
-            var ticks = unixSeconds
-            ticks += WIN_EPOCH_SECONDS
-            ticks -= ticks % 300
-            ticks *= TICKS_PER_SECOND
-            val raw = "$ticks$trustedClientToken"
-            val digest = MessageDigest.getInstance("SHA-256")
-                .digest(raw.toByteArray(Charsets.US_ASCII))
-            return Hex.encode(digest, upper = true)
-        }
+        fun generateSecMsGec(unixSeconds: Long, trustedClientToken: String): String =
+            SecMsGecV2.generate(unixSeconds, trustedClientToken)
 
         fun parseRfc2616Date(date: String): Long? = runCatching {
             checkNotNull(RFC2616.get()).parse(date.trim())?.time?.div(1000)
