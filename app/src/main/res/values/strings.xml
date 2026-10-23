@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Edge Read Aloud TTS</string>
-    <string name="app_byline">by Mezcalito23</string>
+    <string name="app_byline_by">by</string>
+    <string name="app_byline_name">Mezcalito23</string>
     <string name="tts_engine_label">Edge Read Aloud TTS</string>
 
     <string name="subtitle">Motor TTS experimental para Android · v%1$s</string>

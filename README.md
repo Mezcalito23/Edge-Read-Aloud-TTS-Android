@@ -32,16 +32,24 @@ to the system as each MediaCodec buffer is decoded, not after the whole MP3.
   decode, and a light clip of **true** leading/trailing silence so Play Books
   periods are not a hole and words are not chopped.
 
-## Requirements
+## Install
+
+No Android Studio. Install the APK on Android 8.0 or newer (minSdk 26),
+then pick **Edge Read Aloud TTS** as the system engine.
+
+## Build from source
+
+Only if you compile it yourself. The wrapper in this repo is the version
+that matches the project.
 
 | | |
 |---|---|
-| Android Studio | current stable |
-| AGP / Gradle | 9.3 / 9.5 wrapper (9.7.x fine) |
 | JDK | 17 |
-| compileSdk | 37 (OkHttp’s AAR metadata asks for it; no API 37 calls) |
+| Android Gradle Plugin | 9.4.0 |
+| Gradle | 9.7.1 (wrapper) |
+| compileSdk | 37 (no API 37 calls; target stays 36) |
 | targetSdk | 36 |
-| minSdk | 26 (Android 8.0) |
+| minSdk | 26 |
 
 Kotlin is **built into AGP 9** — do not add `org.jetbrains.kotlin.android`.
 
