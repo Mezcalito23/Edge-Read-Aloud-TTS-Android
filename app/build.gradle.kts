@@ -31,8 +31,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // La app solo tiene español (values/) e inglés (values-en/).
-    // Sin esto, el APK arrastra las traducciones de Material en el resto de idiomas.
+    // La app solo traduce español (values/) e inglés (values-en/).
     androidResources {
         localeFilters += listOf("es", "en")
     }
@@ -110,9 +109,6 @@ dependencies {
     // OkHttp (WebSocket + HTTP) y DataStore Preferences (configuración).
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("androidx.datastore:datastore-preferences:1.2.1")
-    // Material 3 Expressive (Views). 1.14.0 es la estable que trae
-    // Theme.Material3Expressive y Widget.Material3Expressive.*.
-    implementation("com.google.android.material:material:1.14.0")
 
     // org.json está incluido en Android SDK, pero para tests JVM necesitamos la librería externa
     testImplementation("org.json:json:20231013")

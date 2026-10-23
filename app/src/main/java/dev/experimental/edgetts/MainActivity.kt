@@ -1,6 +1,7 @@
 package dev.experimental.edgetts
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -14,17 +15,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Button
-import android.widget.CompoundButton
 import android.widget.EditText
+import android.widget.SeekBar
 import android.widget.Spinner
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.slider.Slider
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -35,7 +31,7 @@ import java.util.concurrent.Executors
  * Toda la lógica vive en [SettingsController]; la actividad solo infla,
  * delega y aplica el idioma de UI guardado ([UiLanguage]).
  */
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private lateinit var controller: SettingsController
 
@@ -47,7 +43,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        applySystemBarPadding()
         findViewById<TextView>(R.id.subtitle).text =
             getString(R.string.subtitle, BuildConfig.VERSION_NAME)
         controller = SettingsController(this).apply {
@@ -84,27 +79,11 @@ class MainActivity : AppCompatActivity() {
         controller.release()
         super.onDestroy()
     }
-
-    /** targetSdk 36 dibuja bajo las barras del sistema. El padding las respeta. */
-    private fun applySystemBarPadding() {
-        val content = findViewById<View>(R.id.contentRoot)
-        val extra = (20 * resources.displayMetrics.density).toInt()
-        ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.updatePadding(
-                left = bars.left + extra,
-                top = bars.top + extra,
-                right = bars.right + extra,
-                bottom = bars.bottom + extra
-            )
-            insets
-        }
-    }
 }
 
 /**
  * Mediador entre la UI y el almacenamiento/servicios. Usa ExecutorService y
- * Handler (sin corutinas). La UI usa Material 3 Expressive; el motor no.
+ * Handler (sin corutinas): la única dependencia externa sigue siendo OkHttp.
  */
 class SettingsController(private val activity: Activity) {
 
@@ -131,14 +110,14 @@ class SettingsController(private val activity: Activity) {
     private lateinit var spinnerVoice: Spinner
     private lateinit var labelVoiceCount: TextView
     private lateinit var btnRefreshCatalog: Button
-    private lateinit var sliderRate: Slider
+    private lateinit var sliderRate: SeekBar
     private lateinit var labelRateValue: TextView
-    private lateinit var sliderPitch: Slider
+    private lateinit var sliderPitch: SeekBar
     private lateinit var labelPitchValue: TextView
-    private lateinit var switchUnifiedVoice: CompoundButton
+    private lateinit var switchUnifiedVoice: Switch
     private lateinit var btnResetParams: Button
     private lateinit var textHandshakeDebug: TextView
-    private lateinit var switchCache: CompoundButton
+    private lateinit var switchCache: Switch
     private lateinit var labelCacheSize: TextView
     private lateinit var btnClearCache: Button
     private lateinit var textEndpoints: TextView
@@ -156,14 +135,14 @@ class SettingsController(private val activity: Activity) {
         spinnerVoice: Spinner,
         labelVoiceCount: TextView,
         btnRefreshCatalog: Button,
-        sliderRate: Slider,
+        sliderRate: SeekBar,
         labelRateValue: TextView,
-        sliderPitch: Slider,
+        sliderPitch: SeekBar,
         labelPitchValue: TextView,
-        switchUnifiedVoice: CompoundButton,
+        switchUnifiedVoice: Switch,
         btnResetParams: Button,
         textHandshakeDebug: TextView,
-        switchCache: CompoundButton,
+        switchCache: Switch,
         labelCacheSize: TextView,
         btnClearCache: Button,
         textEndpoints: TextView,
@@ -223,19 +202,16 @@ class SettingsController(private val activity: Activity) {
             override fun onNothingSelected(p: android.widget.AdapterView<*>?) = Unit
         }
 
-        // Velocidad y tono: sliders de -50 a +50 (posición 0..100, valor =
-        // posición - 50). El centro (50) es el valor normal de la voz (0).
-        sliderRate.addOnChangeListener(sliderChange(preview = {
-            labelRateValue.text = formatPercent(it)
-        }))
-        sliderPitch.addOnChangeListener(sliderChange(preview = {
-            labelPitchValue.text = formatHertz(it)
-        }))
-        sliderRate.addOnSliderTouchListener(sliderTouch(
+        // Velocidad y tono: sliders de -50 a +50 (progress 0..100, valor =
+        // progress - 50). El centro (progress 50) es el valor normal de la
+        // voz (0). Se persisten en SettingsStore y los respeta el motor.
+        sliderRate.max = SLIDER_RANGE
+        sliderPitch.max = SLIDER_RANGE
+        sliderRate.setOnSeekBarChangeListener(sliderListener(
             preview = { labelRateValue.text = formatPercent(it) },
             persist = { store.setRate(it) }
         ))
-        sliderPitch.addOnSliderTouchListener(sliderTouch(
+        sliderPitch.setOnSeekBarChangeListener(sliderListener(
             preview = { labelPitchValue.text = formatHertz(it) },
             persist = { store.setPitch(it) }
         ))
@@ -556,10 +532,10 @@ class SettingsController(private val activity: Activity) {
         }
 
         programmaticEdit = true
-        // Sliders: posición 0..100 ↔ valor -50..+50 (centro 50 = 0).
-        sliderRate.value = (snap.ratePercent + SLIDER_OFFSET).coerceIn(0, SLIDER_RANGE).toFloat()
+        // Sliders: progress 0..100 ↔ valor -50..+50 (centro 50 = 0).
+        sliderRate.progress = (snap.ratePercent + SLIDER_OFFSET).coerceIn(0, SLIDER_RANGE)
         labelRateValue.text = formatPercent(snap.ratePercent)
-        sliderPitch.value = (snap.pitchHz + SLIDER_OFFSET).coerceIn(0, SLIDER_RANGE).toFloat()
+        sliderPitch.progress = (snap.pitchHz + SLIDER_OFFSET).coerceIn(0, SLIDER_RANGE)
         labelPitchValue.text = formatHertz(snap.pitchHz)
         switchUnifiedVoice.isChecked = snap.unifiedVoiceMode
         switchCache.isChecked = snap.cacheEnabled
@@ -638,7 +614,7 @@ class SettingsController(private val activity: Activity) {
             setPadding(48, 32, 48, 16)
             textSize = 13f
         }
-        MaterialAlertDialogBuilder(activity)
+        AlertDialog.Builder(activity)
             .setTitle(R.string.user_agent_dialog_title)
             .setMessage(R.string.user_agent_dialog_hint)
             .setView(input)
@@ -706,7 +682,7 @@ class SettingsController(private val activity: Activity) {
             setPadding(48, 32, 48, 16)
             textSize = 13f
         }
-        MaterialAlertDialogBuilder(activity)
+        AlertDialog.Builder(activity)
             .setTitle(R.string.origin_dialog_title)
             .setMessage(R.string.origin_dialog_hint)
             .setView(input)
@@ -805,8 +781,8 @@ class SettingsController(private val activity: Activity) {
      */
     private fun resetParams() {
         programmaticEdit = true
-        sliderRate.value = SLIDER_OFFSET.toFloat()
-        sliderPitch.value = SLIDER_OFFSET.toFloat()
+        sliderRate.progress = SLIDER_OFFSET
+        sliderPitch.progress = SLIDER_OFFSET
         programmaticEdit = false
         labelRateValue.text = formatPercent(0)
         labelPitchValue.text = formatHertz(0)
@@ -816,22 +792,19 @@ class SettingsController(private val activity: Activity) {
     }
 
     /**
-     * Preview en cada paso; persistencia una sola vez al soltar.
-     * fromUser evita reescribir la etiqueta cuando render() mueve el slider.
+     * Preview en cada pixel; persistencia una sola vez al soltar.
      */
-    private fun sliderChange(preview: (value: Int) -> Unit) =
-        Slider.OnChangeListener { slider, _, fromUser ->
-            if (fromUser) preview(slider.value.toInt() - SLIDER_OFFSET)
-        }
-
-    private fun sliderTouch(
+    private fun sliderListener(
         preview: (value: Int) -> Unit,
         persist: (value: Int) -> Unit
-    ) = object : Slider.OnSliderTouchListener {
-        override fun onStartTrackingTouch(slider: Slider) = Unit
+    ) = object : SeekBar.OnSeekBarChangeListener {
+        override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+            if (fromUser) preview(progress - SLIDER_OFFSET)
+        }
 
-        override fun onStopTrackingTouch(slider: Slider) {
-            val value = slider.value.toInt() - SLIDER_OFFSET
+        override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+        override fun onStopTrackingTouch(seekBar: SeekBar) {
+            val value = seekBar.progress - SLIDER_OFFSET
             preview(value)
             persist(value)
         }
