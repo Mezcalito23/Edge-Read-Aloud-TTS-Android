@@ -2,7 +2,8 @@
 <resources>
 
     <!-- Material 3 Expressive oficial (MDC 1.14). DayNight cambia solo.
-         colorPrimary es la marca; superficies, tipo y forma salen del tema. -->
+         La paleta de marca (#0E5E52) ocupa los roles primary. No se aplica
+         color dinámico: no debe reemplazar esa identidad. -->
     <style name="Theme.EdgeTts" parent="Theme.Material3Expressive.DayNight.NoActionBar">
         <item name="colorPrimary">@color/brand_primary</item>
         <item name="colorOnPrimary">@color/brand_on_primary</item>
