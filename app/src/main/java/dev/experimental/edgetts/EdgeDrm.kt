@@ -144,6 +144,7 @@ object SharedProtocol {
     val drm: EdgeDrm = EdgeDrm(state)
     val http: okhttp3.OkHttpClient by lazy {
         okhttp3.OkHttpClient.Builder()
+            .dns(PublicDns())
             .connectTimeout(EdgeProtocolConstants.CONNECT_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
             .readTimeout(EdgeProtocolConstants.READ_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
             .pingInterval(EdgeProtocolConstants.PING_INTERVAL_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
