@@ -1,8 +1,14 @@
 # Edge Read Aloud TTS
 
 **v1.0.10** — Android system text-to-speech engine (`TextToSpeechService`) that
-speaks with Microsoft Edge Read Aloud neural voices over the **unofficial**
-protocol used by the reference client [`rany2/edge-tts`](https://github.com/rany2/edge-tts) 7.2.8.
+speaks with Microsoft Edge Read Aloud neural voices.
+
+The **wire protocol** follows [`rany2/edge-tts`](https://github.com/rany2/edge-tts)
+7.3.1 ([PR 492](https://github.com/rany2/edge-tts/pull/492)): endpoint, SSML,
+headers, and the Sec-MS-GEC v2 token. The **Android engine behavior** follows
+[`ag2s20150909/TTS`](https://github.com/ag2s20150909/TTS): `callback.start()`
+before the network (Play Books drops the utterance otherwise) and PCM handed
+to the system as each MediaCodec buffer is decoded, not after the whole MP3.
 
 > This is **not** an official Microsoft API. Microsoft may change or block it
 > at any time. The engine fails in a controlled way (403, 429, timeouts,
@@ -33,7 +39,8 @@ protocol used by the reference client [`rany2/edge-tts`](https://github.com/rany
 | Android Studio | current stable |
 | AGP / Gradle | 9.3 / 9.5 wrapper (9.7.x fine) |
 | JDK | 17 |
-| compileSdk / targetSdk | 36 |
+| compileSdk | 37 (OkHttp’s AAR metadata asks for it; no API 37 calls) |
+| targetSdk | 36 |
 | minSdk | 26 (Android 8.0) |
 
 Kotlin is **built into AGP 9** — do not add `org.jetbrains.kotlin.android`.
@@ -56,6 +63,18 @@ Edge Read Aloud TTS, and the in-app subtitle).
 **Signing:** without a local keystore, release is signed with the debug key
 (sideload only). One-time keystore: [SIGNING.md](SIGNING.md).
 
+## Where this comes from
+
+| | What we took | What we did not take |
+|---|---|---|
+| [rany2/edge-tts](https://github.com/rany2/edge-tts) 7.3.1 | WebSocket URL, `TrustedClientToken`, Sec-MS-GEC **v2** (`16 hex`-`64 hex`), `Sec-MS-GEC-Version=2-143.0.3650.75`, SSML, Edge headers, 403 clock skew from `Date` | One new socket per chunk (we keep the socket open) |
+| [ag2s20150909/TTS](https://github.com/ag2s20150909/TTS) | System `TextToSpeechService`, `callback.start()` before the request, streaming MP3→PCM so Play Books highlights while audio arrives | Static voice table, in-app pronunciation dictionary, speaking styles, foreground-service notification |
+
+Two later forks of ag2s were read and not merged:
+
+- [zhanshrd/TTS](https://github.com/zhanshrd/TTS) (0.3.0, Sep 2026) still uses the **v1** SHA-256 token. Its useful fixes (correct `Edg/` user-agent, 403 clock skew, bundled voice list, MP3 cache) are already in this app, and newer: live catalog, v2 token, persistent socket.
+- [EoP2/TTS](https://github.com/EoP2/TTS) (Jul 2026) drops the Microsoft socket and requires a private HTTP proxy. Direct synthesis works here, so that proxy is not used.
+
 ## Enable the engine
 
 1. Settings → System → Text-to-speech (or Languages & input).
@@ -69,7 +88,9 @@ restricted settings*, or:
 adb shell appops set --uid dev.experimental.edgetts android:allow_restricted_settings allow
 ```
 
-Logs (one command — service state, last 40 TURN lines, handshake, and the log buffer):
+Logs — **one command**. `dumpsys` prints version, voice, unified mode, cache,
+rate, pitch, last error, handshake, and the last 40 `TURN` lines. `logcat`
+adds the service, client, and settings buffer:
 
 ```bash
 adb shell dumpsys activity service dev.experimental.edgetts/.EdgeReadAloudTtsService; adb logcat -d -t 800 -s EdgeTtsService:D EdgeTtsClient:I EdgeTtsClient:W EdgeTtsSettings:I
