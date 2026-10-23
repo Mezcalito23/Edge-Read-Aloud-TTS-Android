@@ -53,7 +53,8 @@ that matches the project.
 
 Kotlin is **built into AGP 9** — do not add `org.jetbrains.kotlin.android`.
 
-Dependencies: OkHttp 4.12.0 and DataStore Preferences 1.2.1 only.
+Dependencies: OkHttp 4.12.0, DataStore Preferences 1.2.1, and Material
+Components 1.14.0 (`Theme.Material3Expressive` for the settings screen).
 
 ## Build
 
