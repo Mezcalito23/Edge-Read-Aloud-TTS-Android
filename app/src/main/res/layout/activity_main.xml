@@ -11,29 +11,45 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Cabecera: el título y el autor van en bloque, no en la misma fila. -->
-        <TextView
+        <!-- Cabecera -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            android:textColor="@color/text_primary"
-            android:textSize="24sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="@string/app_byline_by"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/app_name"
+                android:textColor="@color/text_primary"
+                android:textSize="24sp"
+                android:textStyle="bold" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/app_byline_name"
-            android:textColor="@color/text_primary"
-            android:textSize="14sp" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:gravity="end"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/app_byline_by"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true"
+                    android:text="@string/app_byline_name"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
 
         <TextView
             android:id="@+id/subtitle"
@@ -49,7 +65,7 @@
             style="@style/Card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_notice"
+            android:background="@color/warning_bg"
             android:orientation="vertical">
 
             <TextView
@@ -98,12 +114,16 @@
                 android:textSize="13sp"
                 tools:ignore="HardcodedText" />
 
-            <!-- El fondo 9-patch del Spinner del tema mide de más y estira
-                 la tarjeta. Un fondo propio no tiene esa altura mínima. -->
+            <!-- Idioma de la UI (sistema / español / inglés). Altura FIJA y
+                 compacta (40dp) para que el Spinner no herede la altura mínima
+                 grande del tema de Android 12 / HarmonyOS, que generaba un
+                 espacio blanco excesivo dentro de la tarjeta Status. El ancho
+                 sigue siendo wrap_content para adaptarse a pantallas
+                 estrechas (smartphone) y anchas (tablet). -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -118,15 +138,9 @@
                 <Spinner
                     android:id="@+id/spinnerUiLanguage"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:background="@drawable/bg_spinner"
-                    android:minHeight="0dp"
-                    android:minWidth="140dp"
-                    android:paddingStart="8dp"
-                    android:paddingTop="6dp"
-                    android:paddingEnd="28dp"
-                    android:paddingBottom="6dp" />
+                    android:layout_height="40dp"
+                    android:minHeight="40dp"
+                    android:minWidth="140dp" />
             </LinearLayout>
         </LinearLayout>
 
@@ -216,13 +230,7 @@
                 android:id="@+id/spinnerVoice"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:background="@drawable/bg_spinner"
-                android:minHeight="0dp"
-                android:paddingStart="8dp"
-                android:paddingTop="8dp"
-                android:paddingEnd="28dp"
-                android:paddingBottom="8dp" />
+                android:layout_marginTop="4dp" />
 
             <Switch
                 android:id="@+id/switchUnifiedVoice"
