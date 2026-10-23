@@ -1,6 +1,6 @@
 # Edge Read Aloud TTS
 
-**v1.0.10** — Android system text-to-speech engine (`TextToSpeechService`) that
+**v1.0.11** — Android system text-to-speech engine (`TextToSpeechService`) that
 speaks with Microsoft Edge Read Aloud neural voices.
 
 The **wire protocol** follows [`rany2/edge-tts`](https://github.com/rany2/edge-tts)
@@ -65,8 +65,11 @@ Dependencies: OkHttp 4.12.0 and DataStore Preferences 1.2.1 only.
 ./gradlew installDebug
 ```
 
-The installed package reports **versionName `1.0.10`** (Settings → Apps →
+The installed package reports **versionName `1.0.11`** (Settings → Apps →
 Edge Read Aloud TTS, and the in-app subtitle).
+
+**v1.0.11** adds a button to check for the latest version and update to it.
+Nothing else changed.
 
 **Signing:** without a local keystore, release is signed with the debug key
 (sideload only). One-time keystore: [SIGNING.md](SIGNING.md).
@@ -88,7 +91,7 @@ That writes `app/build/update.json` with `apkAssetName` `app-release.apk`.
 If the file uploaded to GitHub has another name, pass that exact name:
 
 ```bash
-./gradlew writeUpdateManifest -PupdateApkName=Edge.Read.Aloud.TTS.v1.0.10.apk
+./gradlew writeUpdateManifest -PupdateApkName=Edge.Read.Aloud.TTS.v1.0.11.apk
 ```
 
 Attach **both** files to the **same** release. The name in `update.json` must
@@ -96,9 +99,10 @@ match the APK asset exactly, and both must be the build you just signed.
 Later updates must use the same `release.jks`. Bump `versionCode` or the
 app will report that it is already current.
 
-The published **v1.0.10** release has no `update.json`. Until that file is
-added to a stable release, the app says it could not verify and offers
-Releases. It does not claim that v1.0.10 is already the latest.
+**v1.0.11** (`versionCode` 27) is the first release meant to carry
+`update.json`. The published v1.0.10 APK has neither the button nor that
+file. A build that still reports code 26 can see 1.0.11 only after both
+assets are on the v1.0.11 release.
 
 ## Where this comes from
 

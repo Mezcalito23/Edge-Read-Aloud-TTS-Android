@@ -25,8 +25,8 @@ android {
         applicationId = "dev.experimental.edgetts"
         minSdk = 26
         targetSdk = 36
-        versionCode = 26
-        versionName = "1.0.10"
+        versionCode = 27
+        versionName = "1.0.11"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
