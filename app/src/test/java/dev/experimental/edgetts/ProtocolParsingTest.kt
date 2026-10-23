@@ -207,13 +207,13 @@ class ProtocolParsingTest {
         )
         assertEquals(24000, EdgeProtocolConstants.SAMPLE_RATE_HZ)
         assertEquals(
-            "wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1",
+            "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1",
             EdgeProtocolConstants.WS_BASE_URL
         )
         assertEquals(
             EdgeProtocolConstants.WS_BASE_URL,
             EdgeProtocolConstants.currentWsUrl(
-                "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1"
+                "wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1"
             )
         )
     }

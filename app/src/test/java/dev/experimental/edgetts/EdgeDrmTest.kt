@@ -18,6 +18,11 @@ class EdgeDrmTest {
     fun generateSecMsGecMatchesKnownVector() {
         assertEquals(knownGec, EdgeDrm.generateSecMsGec(unix, token))
         assertEquals(knownGec, EdgeDrm(ProtocolState()).generateSecMsGec(unix, token))
+        // Vector publicado en rany2/edge-tts PR 492.
+        assertEquals(
+            "492D7694A183A45E-56E821F95D4579C5B7C7E33DC7303FF379EC36D510213555BBBB9EB17EF15876",
+            EdgeDrm.generateSecMsGec(1_791_888_000L, token)
+        )
         assertEquals("B0ED", Hex.encode(byteArrayOf(0xB0.toByte(), 0xED.toByte()), upper = true))
     }
 
@@ -163,7 +168,7 @@ class EdgeDrmTest {
         val query = url.substringAfter('?')
         val keys = query.split('&').map { it.substringBefore('=') }
         assertEquals(
-            listOf("Ocp-Apim-Subscription-Key", "ConnectionId", "Sec-MS-GEC", "Sec-MS-GEC-Version"),
+            listOf("TrustedClientToken", "ConnectionId", "Sec-MS-GEC", "Sec-MS-GEC-Version"),
             keys
         )
     }

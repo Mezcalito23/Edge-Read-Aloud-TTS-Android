@@ -18,18 +18,15 @@ object EdgeProtocolConstants {
         "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list" +
             "?trustedclienttoken=" + TRUSTED_CLIENT_TOKEN
 
-    /**
-     * Síntesis desde octubre 2026. El host viejo
-     * (speech.platform.bing.com/.../edge/v1) responde 403 o no resuelve.
-     * El catálogo de voces sigue en el host anterior.
-     */
     const val WS_BASE_URL: String =
-        "wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1"
+        "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1"
 
-    /** Si DataStore guardó el host retirado, usar el actual. */
+    /**
+     * El host de síntesis no cambió en rany2 7.3.1 (PR 492). Si DataStore
+     * guardó el host de prueba api.msedgeservices.com, volver al de Edge.
+     */
     fun currentWsUrl(stored: String?): String {
-        if (stored.isNullOrBlank()) return WS_BASE_URL
-        if (stored.contains("speech.platform.bing.com") && stored.contains("/edge/v1")) {
+        if (stored.isNullOrBlank() || stored.contains("api.msedgeservices.com")) {
             return WS_BASE_URL
         }
         return stored
