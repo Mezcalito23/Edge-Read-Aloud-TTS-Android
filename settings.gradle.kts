@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 pluginManagement {
     repositories {
         google {
@@ -12,6 +14,9 @@ pluginManagement {
     }
 }
 
+// RepositoriesMode sigue marcado @Incubating en Gradle 9. El modo es el
+// correcto: solo los repositorios de este archivo.
+@Suppress("UnstableApiUsage")
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {

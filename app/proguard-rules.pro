@@ -8,12 +8,7 @@
 -keep class dev.experimental.edgetts.InstallVoiceData { *; }
 -keep class dev.experimental.edgetts.GetSampleText { *; }
 
-# DataStore Preferences (protobuf lite).
--keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite {
-    <fields>;
-}
-
-# OkHttp / Okio
+# OkHttp / Okio. DataStore trae sus propias reglas de protobuf.
 -dontwarn okhttp3.**
 -dontwarn okio.**
 -dontwarn org.conscrypt.**

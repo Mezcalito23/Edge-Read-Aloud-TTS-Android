@@ -73,7 +73,11 @@ android {
         disable += setOf(
             "IconMissingDensityFolder",
             "GradleDependency",
-            "AndroidGradlePluginVersion"
+            "AndroidGradlePluginVersion",
+            // compileSdk 37 solo para poder compilar. targetSdk 36 mantiene
+            // el comportamiento ya probado en la tablet; subirlo cambia
+            // reglas de Android en tiempo de ejecución.
+            "ExpiredTargetSdkVersion"
         )
     }
 }
@@ -84,11 +88,13 @@ android {
 //    las tareas por variante de la build de depuración.
 if (tasks.findByName("unitTestClasses") == null) {
     tasks.register("unitTestClasses") {
+        description = "Alias de compileDebugUnitTestSources para Android Studio anterior a agosto de 2026."
         dependsOn("compileDebugUnitTestSources")
     }
 }
 if (tasks.findByName("androidTestClasses") == null) {
     tasks.register("androidTestClasses") {
+        description = "Alias de compileDebugAndroidTestSources para Android Studio anterior a agosto de 2026."
         dependsOn("compileDebugAndroidTestSources")
     }
 }
