@@ -265,9 +265,9 @@ class SettingsController(private val activity: Activity) {
         // Idioma de la UI: sistema / español / inglés (persistente y
         // aplicable en cualquier versión de Android vía UiLanguage).
         ArrayAdapter.createFromResource(
-            activity, R.array.ui_language_options, android.R.layout.simple_spinner_item
+            activity, R.array.ui_language_options, R.layout.spinner_language_item
         ).also {
-            it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            it.setDropDownViewResource(R.layout.spinner_language_item)
             spinnerUiLanguage.adapter = it
         }
         spinnerUiLanguage.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {

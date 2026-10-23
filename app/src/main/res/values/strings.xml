@@ -132,8 +132,7 @@
     <string name="about_version">Versión instalada: %1$s (%2$d)</string>
     <string name="action_check_updates">Buscar actualizaciones</string>
     <string name="action_open_project">Ver proyecto en GitHub</string>
-    <string name="action_open_kofi">Apoyar el desarrollo en Ko-fi</string>
-    <string name="about_support_note">Aportación voluntaria. La app funciona igual sin contribuir.</string>
+    <string name="action_open_kofi">Dona una propina Invitándome un café 😊</string>
     <string name="update_checking">Buscando actualizaciones…</string>
     <string name="update_up_to_date">Ya tienes la última versión (%1$s, código %2$d).</string>
     <string name="update_installed_newer">No hay una versión estable posterior. La instalada (código %1$d) es más nueva que la publicada (%2$s, código %3$d).</string>

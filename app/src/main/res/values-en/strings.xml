@@ -134,8 +134,7 @@
     <string name="about_version">Installed version: %1$s (%2$d)</string>
     <string name="action_check_updates">Check for updates</string>
     <string name="action_open_project">View project on GitHub</string>
-    <string name="action_open_kofi">Support development on Ko-fi</string>
-    <string name="about_support_note">Voluntary contribution. The app works the same without it.</string>
+    <string name="action_open_kofi">Dona una propina Invitándome un café 😊</string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_up_to_date">You already have the latest version (%1$s, code %2$d).</string>
     <string name="update_installed_newer">There is no newer stable release. The installed build (code %1$d) is newer than the published one (%2$s, code %3$d).</string>
