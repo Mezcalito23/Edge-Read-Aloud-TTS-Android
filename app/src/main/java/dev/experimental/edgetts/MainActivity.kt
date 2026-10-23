@@ -2,8 +2,10 @@ package dev.experimental.edgetts
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -69,7 +71,12 @@ class MainActivity : Activity() {
                 spinnerUiLanguage = findViewById(R.id.spinnerUiLanguage),
                 btnTestVoice = findViewById(R.id.btnTestVoice),
                 btnReset = findViewById(R.id.btnReset),
-                btnOpenTtsSettings = findViewById(R.id.btnOpenTtsSettings)
+                btnOpenTtsSettings = findViewById(R.id.btnOpenTtsSettings),
+                labelInstalledVersion = findViewById(R.id.labelInstalledVersion),
+                btnCheckUpdates = findViewById(R.id.btnCheckUpdates),
+                textUpdateStatus = findViewById(R.id.textUpdateStatus),
+                btnOpenProject = findViewById(R.id.btnOpenProject),
+                btnOpenKofi = findViewById(R.id.btnOpenKofi)
             )
         }
         controller.refreshAll()
@@ -127,6 +134,14 @@ class SettingsController(private val activity: Activity) {
     private lateinit var btnTestVoice: Button
     private lateinit var btnReset: Button
     private lateinit var btnOpenTtsSettings: Button
+    private lateinit var labelInstalledVersion: TextView
+    private lateinit var btnCheckUpdates: Button
+    private lateinit var textUpdateStatus: TextView
+    private lateinit var btnOpenProject: Button
+    private lateinit var btnOpenKofi: Button
+
+    private val updates = UpdateClient(UpdateClient.http(), UpdateCheck.userAgent(BuildConfig.VERSION_NAME))
+    @Volatile private var updateInFlight = false
 
     fun bind(
         statusEngine: TextView,
@@ -151,7 +166,12 @@ class SettingsController(private val activity: Activity) {
         spinnerUiLanguage: Spinner,
         btnTestVoice: Button,
         btnReset: Button,
-        btnOpenTtsSettings: Button
+        btnOpenTtsSettings: Button,
+        labelInstalledVersion: TextView,
+        btnCheckUpdates: Button,
+        textUpdateStatus: TextView,
+        btnOpenProject: Button,
+        btnOpenKofi: Button
     ) {
         this.statusEngine = statusEngine
         this.statusProvider = statusProvider
@@ -176,6 +196,20 @@ class SettingsController(private val activity: Activity) {
         this.btnTestVoice = btnTestVoice
         this.btnReset = btnReset
         this.btnOpenTtsSettings = btnOpenTtsSettings
+        this.labelInstalledVersion = labelInstalledVersion
+        this.btnCheckUpdates = btnCheckUpdates
+        this.textUpdateStatus = textUpdateStatus
+        this.btnOpenProject = btnOpenProject
+        this.btnOpenKofi = btnOpenKofi
+
+        labelInstalledVersion.text = activity.getString(
+            R.string.about_version,
+            BuildConfig.VERSION_NAME,
+            BuildConfig.VERSION_CODE,
+        )
+        btnCheckUpdates.setOnClickListener { checkForUpdates() }
+        btnOpenProject.setOnClickListener { openExternal(UpdateCheck.PROJECT_PAGE) }
+        btnOpenKofi.setOnClickListener { openExternal(UpdateCheck.KOFI_PAGE) }
 
         btnEditOrigin.setOnClickListener { editOrigin() }
         // Atajo directo a Ajustes → Texto a voz del sistema (patrón Maise).
@@ -857,6 +891,126 @@ class SettingsController(private val activity: Activity) {
         releaseTts()
         io.shutdownNow()
         Log.i("EdgeTtsSettings", "controlador liberado")
+    }
+
+    private fun checkForUpdates() {
+        if (updateInFlight) return
+        updateInFlight = true
+        btnCheckUpdates.isEnabled = false
+        textUpdateStatus.visibility = View.VISIBLE
+        textUpdateStatus.text = activity.getString(R.string.update_checking)
+        val installedCode = BuildConfig.VERSION_CODE
+        val installedName = BuildConfig.VERSION_NAME
+        io.execute {
+            val result = try {
+                updates.check(installedCode)
+            } catch (_: Exception) {
+                UpdateResult.NetworkFailed
+            }
+            main.post {
+                updateInFlight = false
+                if (activity.isDestroyed || activity.isFinishing) return@post
+                btnCheckUpdates.isEnabled = true
+                showUpdateResult(result, installedName, installedCode)
+            }
+        }
+    }
+
+    private fun showUpdateResult(result: UpdateResult, installedName: String, installedCode: Int) {
+        when (result) {
+            is UpdateResult.UpToDate -> {
+                textUpdateStatus.text = activity.getString(
+                    R.string.update_up_to_date,
+                    result.versionName,
+                    result.versionCode,
+                )
+            }
+            is UpdateResult.InstalledIsNewer -> {
+                textUpdateStatus.text = activity.getString(
+                    R.string.update_installed_newer,
+                    result.installedCode,
+                    result.remoteName,
+                    result.remoteCode,
+                )
+            }
+            is UpdateResult.Available -> {
+                textUpdateStatus.text = activity.getString(
+                    R.string.update_dialog_body,
+                    installedName,
+                    installedCode,
+                    result.remoteName,
+                    result.remoteCode,
+                )
+                AlertDialog.Builder(activity)
+                    .setTitle(R.string.update_dialog_title)
+                    .setMessage(
+                        activity.getString(
+                            R.string.update_dialog_body,
+                            installedName,
+                            installedCode,
+                            result.remoteName,
+                            result.remoteCode,
+                        )
+                    )
+                    .setPositiveButton(R.string.action_download_apk) { _, _ ->
+                        openExternal(result.apkUrl)
+                    }
+                    .setNeutralButton(R.string.action_view_release) { _, _ ->
+                        openExternal(result.releasePageUrl)
+                    }
+                    .setNegativeButton(R.string.action_later, null)
+                    .show()
+            }
+            UpdateResult.NoStableRelease -> {
+                textUpdateStatus.text = activity.getString(R.string.update_no_stable)
+            }
+            is UpdateResult.CannotVerify -> offerReleases(R.string.update_cannot_verify, result.releasesPage)
+            is UpdateResult.InvalidMetadata -> offerReleases(R.string.update_invalid, result.releasesPage)
+            is UpdateResult.UnsupportedSchema -> offerReleases(R.string.update_schema, result.releasesPage)
+            is UpdateResult.Incomplete -> {
+                textUpdateStatus.text = activity.getString(R.string.update_incomplete, result.apkAssetName)
+                AlertDialog.Builder(activity)
+                    .setMessage(textUpdateStatus.text)
+                    .setPositiveButton(R.string.action_open_releases) { _, _ ->
+                        openExternal(result.releasesPage)
+                    }
+                    .setNegativeButton(R.string.action_later, null)
+                    .show()
+            }
+            UpdateResult.RateLimited -> {
+                textUpdateStatus.text = activity.getString(R.string.update_rate_limit)
+            }
+            UpdateResult.TimedOut -> {
+                textUpdateStatus.text = activity.getString(R.string.update_timeout)
+            }
+            UpdateResult.NetworkFailed -> {
+                textUpdateStatus.text = activity.getString(R.string.update_network)
+            }
+        }
+    }
+
+    private fun offerReleases(message: Int, page: String) {
+        textUpdateStatus.text = activity.getString(message)
+        AlertDialog.Builder(activity)
+            .setMessage(message)
+            .setPositiveButton(R.string.action_open_releases) { _, _ -> openExternal(page) }
+            .setNegativeButton(R.string.action_later, null)
+            .show()
+    }
+
+    private fun openExternal(url: String) {
+        if (!UpdateCheck.isAllowedDownloadUrl(url) &&
+            url != UpdateCheck.PROJECT_PAGE &&
+            url != UpdateCheck.KOFI_PAGE &&
+            url != UpdateCheck.RELEASES_PAGE
+        ) {
+            return
+        }
+        try {
+            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(activity, R.string.update_no_browser, Toast.LENGTH_LONG).show()
+        }
     }
 
     companion object {

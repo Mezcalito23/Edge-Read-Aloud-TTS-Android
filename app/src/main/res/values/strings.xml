@@ -127,4 +127,29 @@
     <string name="error_audio_deliver">No se pudo entregar el audio al sistema.</string>
     <string name="error_http_client">Cliente HTTP no inicializado.</string>
     <string name="error_empty_audio">El proveedor no devolvió audio (respuesta vacía).</string>
+
+    <string name="card_about">Acerca de</string>
+    <string name="about_version">Versión instalada: %1$s (%2$d)</string>
+    <string name="action_check_updates">Buscar actualizaciones</string>
+    <string name="action_open_project">Ver proyecto en GitHub</string>
+    <string name="action_open_kofi">Apoyar el desarrollo en Ko-fi</string>
+    <string name="about_support_note">Aportación voluntaria. La app funciona igual sin contribuir.</string>
+    <string name="update_checking">Buscando actualizaciones…</string>
+    <string name="update_up_to_date">Ya tienes la última versión (%1$s, código %2$d).</string>
+    <string name="update_installed_newer">No hay una versión estable posterior. La instalada (código %1$d) es más nueva que la publicada (%2$s, código %3$d).</string>
+    <string name="update_no_stable">No hay una release estable disponible.</string>
+    <string name="update_cannot_verify">No se pudo verificar automáticamente. Falta update.json en la última release.</string>
+    <string name="update_invalid">Los metadatos de la release no son válidos.</string>
+    <string name="update_schema">El formato de update.json no es compatible con esta app.</string>
+    <string name="update_incomplete">La publicación está incompleta: no está el APK %1$s.</string>
+    <string name="update_rate_limit">GitHub limitó las consultas por un momento. Inténtalo más tarde.</string>
+    <string name="update_timeout">Tiempo de espera agotado. Revisa la conexión e inténtalo de nuevo.</string>
+    <string name="update_network">No se pudo consultar GitHub. Revisa la conexión e inténtalo de nuevo.</string>
+    <string name="update_dialog_title">Nueva versión disponible</string>
+    <string name="update_dialog_body">Versión instalada: %1$s (%2$d)\nVersión disponible: %3$s (%4$d)</string>
+    <string name="action_download_apk">Descargar APK</string>
+    <string name="action_view_release">Ver novedades</string>
+    <string name="action_open_releases">Abrir Releases</string>
+    <string name="action_later">Más tarde</string>
+    <string name="update_no_browser">No hay una aplicación que pueda abrir el enlace.</string>
 </resources>

@@ -71,6 +71,35 @@ Edge Read Aloud TTS, and the in-app subtitle).
 **Signing:** without a local keystore, release is signed with the debug key
 (sideload only). One-time keystore: [SIGNING.md](SIGNING.md).
 
+## Updates
+
+The app checks for updates only when the user taps **Check for updates**.
+It reads `versionCode` from an `update.json` asset on the latest stable
+GitHub release. It does not compare the tag or `versionName`.
+
+`assembleRelease` still writes `app/build/outputs/apk/release/app-release.apk`.
+Generate the manifest from the same `versionCode` and `versionName`:
+
+```bash
+./gradlew writeUpdateManifest
+```
+
+That writes `app/build/update.json` with `apkAssetName` `app-release.apk`.
+If the file uploaded to GitHub has another name, pass that exact name:
+
+```bash
+./gradlew writeUpdateManifest -PupdateApkName=Edge.Read.Aloud.TTS.v1.0.10.apk
+```
+
+Attach **both** files to the **same** release. The name in `update.json` must
+match the APK asset exactly, and both must be the build you just signed.
+Later updates must use the same `release.jks`. Bump `versionCode` or the
+app will report that it is already current.
+
+The published **v1.0.10** release has no `update.json`. Until that file is
+added to a stable release, the app says it could not verify and offers
+Releases. It does not claim that v1.0.10 is already the latest.
+
 ## Where this comes from
 
 | | What we took | What we did not take |

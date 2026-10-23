@@ -87,6 +87,47 @@ android {
     }
 }
 
+// update.json de la release. Los números salen de versionCode y versionName;
+// no se copian a mano. -PupdateApkName cambia solo el nombre publicado del APK.
+tasks.register("writeUpdateManifest") {
+    description = "Escribe app/build/update.json con la versión de esta app."
+    val versionCodeProvider = provider { android.defaultConfig.versionCode ?: 0 }
+    val versionNameProvider = provider { android.defaultConfig.versionName.orEmpty() }
+    val apkNameProvider = providers.gradleProperty("updateApkName").orElse("app-release.apk")
+    val outputFile = layout.buildDirectory.file("update.json")
+    inputs.property("versionCode", versionCodeProvider)
+    inputs.property("versionName", versionNameProvider)
+    inputs.property("apkAssetName", apkNameProvider)
+    outputs.file(outputFile)
+    doLast {
+        val code = versionCodeProvider.get()
+        val name = versionNameProvider.get()
+        val apk = apkNameProvider.get()
+        val file = outputFile.get().asFile
+        file.parentFile?.mkdirs()
+        file.writeText(
+            "{\n" +
+                "  \"schemaVersion\": 1,\n" +
+                "  \"versionCode\": $code,\n" +
+                "  \"versionName\": ${quoted(name)},\n" +
+                "  \"apkAssetName\": ${quoted(apk)}\n" +
+                "}\n"
+        )
+    }
+}
+
+fun quoted(value: String): String = buildString {
+    append('"')
+    for (c in value) {
+        when (c) {
+            '\\' -> append("\\\\")
+            '"' -> append("\\\"")
+            else -> append(c)
+        }
+    }
+    append('"')
+}
+
 // ── Compatibilidad con "Make Project" de Android Studio anteriores a
 //    agosto de 2026: AGP 9 eliminó las tareas agregadas unitTestClasses /
 //    androidTestClasses que esos Studio aún piden. Estos alias las mapean a

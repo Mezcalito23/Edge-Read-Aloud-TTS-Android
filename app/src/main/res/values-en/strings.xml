@@ -129,4 +129,29 @@
     <string name="error_audio_deliver">Could not deliver audio to the system.</string>
     <string name="error_http_client">HTTP client not initialized.</string>
     <string name="error_empty_audio">The provider returned no audio (empty response).</string>
+
+    <string name="card_about">About</string>
+    <string name="about_version">Installed version: %1$s (%2$d)</string>
+    <string name="action_check_updates">Check for updates</string>
+    <string name="action_open_project">View project on GitHub</string>
+    <string name="action_open_kofi">Support development on Ko-fi</string>
+    <string name="about_support_note">Voluntary contribution. The app works the same without it.</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_up_to_date">You already have the latest version (%1$s, code %2$d).</string>
+    <string name="update_installed_newer">There is no newer stable release. The installed build (code %1$d) is newer than the published one (%2$s, code %3$d).</string>
+    <string name="update_no_stable">No stable release is available.</string>
+    <string name="update_cannot_verify">Could not verify automatically. The latest release has no update.json.</string>
+    <string name="update_invalid">The release metadata is not valid.</string>
+    <string name="update_schema">This app does not understand that update.json format.</string>
+    <string name="update_incomplete">The release is incomplete: APK %1$s is missing.</string>
+    <string name="update_rate_limit">GitHub is limiting requests for a moment. Try again later.</string>
+    <string name="update_timeout">Timed out. Check the connection and try again.</string>
+    <string name="update_network">Could not reach GitHub. Check the connection and try again.</string>
+    <string name="update_dialog_title">New version available</string>
+    <string name="update_dialog_body">Installed version: %1$s (%2$d)\nAvailable version: %3$s (%4$d)</string>
+    <string name="action_download_apk">Download APK</string>
+    <string name="action_view_release">View release notes</string>
+    <string name="action_open_releases">Open Releases</string>
+    <string name="action_later">Later</string>
+    <string name="update_no_browser">No app can open this link.</string>
 </resources>
