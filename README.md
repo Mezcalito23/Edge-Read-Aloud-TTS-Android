@@ -69,10 +69,10 @@ restricted settings*, or:
 adb shell appops set --uid dev.experimental.edgetts android:allow_restricted_settings allow
 ```
 
-Logs:
+Logs (one command — service state, last 40 TURN lines, handshake, and the log buffer):
 
 ```bash
-adb logcat -s EdgeTtsService:D EdgeTtsClient:I
+adb shell dumpsys activity service dev.experimental.edgetts/.EdgeReadAloudTtsService; adb logcat -d -t 800 -s EdgeTtsService:D EdgeTtsClient:I EdgeTtsClient:W EdgeTtsSettings:I
 ```
 
 ## Architecture

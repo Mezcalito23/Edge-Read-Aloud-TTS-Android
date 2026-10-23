@@ -55,6 +55,9 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     private var lastTurnHash = 0
     @Volatile
     private var sessionTurn = 0
+    @Volatile
+    private var lastFinishedAt = 0L
+    private val turnHistory = ArrayDeque<String>(TURN_HISTORY)
 
     // Idioma cargado por el cliente (setLanguage). Se inicializa con el
     // idioma del SISTEMA para que el TTS por defecto siga al dispositivo
@@ -524,6 +527,8 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
         lastTurnAt = now
         lastTurnChars = text.length
         lastTurnHash = text.hashCode()
+        var didStart = false
+        var probeMs = 0
 
         fun ensureStarted(rate: Int): Boolean =
             if (started.compareAndSet(false, true)) {
@@ -536,14 +541,23 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 }.isSuccess
             } else true
 
-        // ag2s/TTS: Play Books exige start() ANTES de la red; si no, el hueco
-        // entre frases (punto) se come el TLS + el decode entero.
-        if (!ensureStarted(EdgeProtocolConstants.SAMPLE_RATE_HZ)) {
-            guard.error(callback, tr(R.string.error_audio_start))
-            return
-        }
-
         try {
+            val probe = waitOutPlayBooksProbe()
+            probeMs = probe.second
+            if (!probe.first) {
+                result = "cancel"
+                guard.error(callback, TextToSpeech.STOPPED)
+                return
+            }
+            // ag2s/TTS: Play Books exige start() ANTES de la red; si no, el hueco
+            // entre frases (punto) se come el TLS + el decode entero.
+            if (!ensureStarted(EdgeProtocolConstants.SAMPLE_RATE_HZ)) {
+                result = "fail"
+                guard.error(callback, tr(R.string.error_audio_start))
+                return
+            }
+            didStart = true
+
             for (segment in segments) {
                 if (guard.isFired) return
                 if (stopRequested) {
@@ -586,12 +600,17 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
                 else -> "mix"
             }
             val gapLabel = if (gap < 0L) "-" else "${gap}ms"
+            val idle = if (lastFinishedAt == 0L) -1L else now - lastFinishedAt
+            val idleLabel = if (idle < 0L) "-" else "${idle}ms"
             val turn =
-                "TURN n=$sessionTurn gap=$gapLabel chars=${text.length} segs=${metrics.segments} " +
+                "TURN n=$sessionTurn gap=$gapLabel idle=$idleLabel chars=${text.length} segs=${metrics.segments} " +
                     "caller=$caller dup=$dup burst=${gap in 0L..800L} sessionStart=$sessionStart " +
-                    "result=$result clipLead=${metrics.clipLeadMs}ms clipTail=${metrics.clipTailMs}ms " +
+                    "started=$didStart probe=${probeMs}ms result=$result " +
+                    "clipLead=${metrics.clipLeadMs}ms clipTail=${metrics.clipTailMs}ms " +
                     "persist=$persist cache=$cacheKind rate=${request.speechRate}"
             AppLog.i(TAG) { turn }
+            rememberTurn(turn)
+            lastFinishedAt = android.os.SystemClock.elapsedRealtime()
             runCatching { settings?.setLastMetrics("$turn · ${metrics.line()}") }
         }
     }
@@ -827,7 +846,63 @@ class EdgeReadAloudTtsService : TextToSpeechService() {
     private fun tr(id: Int): String =
         runCatching { getString(id) }.getOrDefault("")
 
+    /**
+     * Play Books dispara el primer bloque dos veces (~30 ms). Si llamamos
+     * start() en el primero, el subrayado arranca en vacío. Solo en el
+     * primer turno tras una pausa esperamos 80 ms: si llega onStop(), no
+     * hay start(). El resto de frases arranca al instante (si no, el punto
+     * se come el TLS).
+     */
+    private fun waitOutPlayBooksProbe(): Pair<Boolean, Int> {
+        val now = android.os.SystemClock.elapsedRealtime()
+        val idle = lastFinishedAt == 0L || now - lastFinishedAt > PROBE_IDLE_MS
+        if (!idle) return true to 0
+        val until = now + PROBE_WAIT_MS
+        while (!stopRequested && android.os.SystemClock.elapsedRealtime() < until) {
+            try {
+                Thread.sleep(10L)
+            } catch (_: InterruptedException) {
+                break
+            }
+        }
+        val waited = (android.os.SystemClock.elapsedRealtime() - now).toInt()
+        return (!stopRequested) to waited
+    }
+
+    private fun rememberTurn(line: String) {
+        synchronized(turnHistory) {
+            if (turnHistory.size >= TURN_HISTORY) turnHistory.removeFirst()
+            turnHistory.addLast(line)
+        }
+    }
+
+    override fun dump(
+        fd: java.io.FileDescriptor,
+        writer: java.io.PrintWriter,
+        args: Array<String>
+    ) {
+        writer.println("Edge Read Aloud TTS ${BuildConfig.VERSION_NAME}")
+        val snap = settings?.snapshot()
+        writer.println("voice=${snap?.voice} unified=${snap?.unifiedVoiceMode} cache=${snap?.cacheEnabled}")
+        writer.println("rate=${snap?.ratePercent} pitch=${snap?.pitchHz}")
+        writer.println("lastError=${snap?.lastError.orEmpty()}")
+        writer.println("lastMetrics=${snap?.lastMetrics.orEmpty()}")
+        val hs = snap?.handshakeDebug.orEmpty()
+        if (hs.isNotBlank()) {
+            writer.println("handshake:")
+            hs.lineSequence().forEach { writer.println("  $it") }
+        }
+        writer.println("turns:")
+        synchronized(turnHistory) {
+            if (turnHistory.isEmpty()) writer.println("  (none yet)")
+            else turnHistory.forEach { writer.println("  $it") }
+        }
+    }
+
     companion object {
         private const val TAG = "EdgeTtsService"
+        private const val PROBE_IDLE_MS = 1_500L
+        private const val PROBE_WAIT_MS = 80L
+        private const val TURN_HISTORY = 40
     }
 }

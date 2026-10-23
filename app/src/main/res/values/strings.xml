@@ -49,7 +49,7 @@
 
     <!-- Caché -->
     <string name="cache_switch">Guardar audio sintetizado en este dispositivo</string>
-    <string name="cache_note">Clave SHA-256(texto+voz+locale+rate+pitch+formato+versión). Máx. 100 MB; los archivos antiguos se eliminan solos.</string>
+    <string name="cache_note">No es necesaria para el correcto funcionamiento de la app. Solo sirve para las apps que pueden regresar el audio 15 o 30 segundos. Máx. 100 MB.</string>
     <string name="cache_used_fmt">Ocupada: %1$s de %2$s</string>
     <string name="cache_freed_fmt">Caché borrada (%1$s liberados).</string>
 
