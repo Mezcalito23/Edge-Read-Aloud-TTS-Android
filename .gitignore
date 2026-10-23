@@ -6,6 +6,10 @@
 .gradle/
 build/
 */build/
+gradle/gradle-daemon-jvm.properties
+
+# Android Studio escribe aquí la ruta local del SDK. No se versiona.
+local.properties
 
 # Kotlin
 .kotlin/
