@@ -128,7 +128,6 @@
     <string name="error_http_client">Cliente HTTP no inicializado.</string>
     <string name="error_empty_audio">El proveedor no devolvió audio (respuesta vacía).</string>
 
-    <string name="card_about">Acerca de</string>
     <string name="about_version">Versión instalada: %1$s (%2$d)</string>
     <string name="action_check_updates">Buscar actualizaciones</string>
     <string name="action_open_project">Ver proyecto en GitHub</string>
