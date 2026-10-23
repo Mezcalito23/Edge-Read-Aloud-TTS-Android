@@ -31,6 +31,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // La app solo tiene español (values/) e inglés (values-en/).
+    // Sin esto, el APK arrastra las traducciones de Material en el resto de idiomas.
+    androidResources {
+        localeFilters += listOf("es", "en")
+    }
+
     signingConfigs {
         val loaded = keystoreProperties
         if (loaded != null) {
