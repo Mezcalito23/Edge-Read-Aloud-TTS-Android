@@ -13,7 +13,7 @@
     <!-- Tarjetas -->
     <string name="card_status">Estado</string>
     <string name="card_error">Último error</string>
-    <string name="card_voice">Voz</string>
+    <string name="card_voice">Selecciona la voz del motor</string>
     <string name="card_params">Velocidad y tono</string>
     <string name="card_cache">Caché de audio</string>
     <string name="card_endpoints">Endpoints y handshake</string>
@@ -21,7 +21,7 @@
     <!-- Idioma de la UI -->
     <string name="app_language_label">Idioma de la aplicación · App language</string>
     <string-array name="ui_language_options">
-        <item>Idioma del sistema · System language</item>
+        <item>Choose a language</item>
         <item>Español</item>
         <item>English</item>
     </string-array>

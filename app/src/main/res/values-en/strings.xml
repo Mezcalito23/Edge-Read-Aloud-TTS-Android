@@ -16,7 +16,7 @@
     <!-- Cards -->
     <string name="card_status">Status</string>
     <string name="card_error">Last error</string>
-    <string name="card_voice">Voice</string>
+    <string name="card_voice">Select the engine voice</string>
     <string name="card_params">Rate and pitch</string>
     <string name="card_cache">Audio cache</string>
     <string name="card_endpoints">Endpoints &amp; handshake</string>
@@ -24,7 +24,7 @@
     <!-- UI language -->
     <string name="app_language_label">App language · Idioma de la aplicación</string>
     <string-array name="ui_language_options">
-        <item>System language · Idioma del sistema</item>
+        <item>Choose a language</item>
         <item>Español</item>
         <item>English</item>
     </string-array>
