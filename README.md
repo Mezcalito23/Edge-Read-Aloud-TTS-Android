@@ -4,7 +4,7 @@
 speaks with Microsoft Edge Read Aloud neural voices.
 
 The **wire protocol** follows [`rany2/edge-tts`](https://github.com/rany2/edge-tts)
-7.3.1 ([PR 492](https://github.com/rany2/edge-tts/pull/492)): endpoint, SSML,
+([PR 492](https://github.com/rany2/edge-tts/pull/492)): endpoint, SSML,
 headers, and the Sec-MS-GEC v2 token. The **Android engine behavior** follows
 [`ag2s20150909/TTS`](https://github.com/ag2s20150909/TTS): `callback.start()`
 before the network (Play Books drops the utterance otherwise) and PCM handed
