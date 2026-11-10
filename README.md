@@ -108,7 +108,7 @@ assets are on the v1.0.11 release.
 
 | | What we took | What we did not take |
 |---|---|---|
-| [rany2/edge-tts](https://github.com/rany2/edge-tts) 7.3.1 | WebSocket URL, `TrustedClientToken`, Sec-MS-GEC **v2** (`16 hex`-`64 hex`), `Sec-MS-GEC-Version=2-143.0.3650.75`, SSML, Edge headers, 403 clock skew from `Date` | One new socket per chunk (we keep the socket open) |
+| [rany2/edge-tts](https://github.com/rany2/edge-tts) | WebSocket URL, `TrustedClientToken`, Sec-MS-GEC **v2** (`16 hex`-`64 hex`), `Sec-MS-GEC-Version=2-143.0.3650.75`, SSML, Edge headers, 403 clock skew from `Date` | One new socket per chunk (we keep the socket open) |
 | [ag2s20150909/TTS](https://github.com/ag2s20150909/TTS) | System `TextToSpeechService`, `callback.start()` before the request, streaming MP3→PCM so Play Books highlights while audio arrives | Static voice table, in-app pronunciation dictionary, speaking styles, foreground-service notification |
 
 ## Enable the engine
