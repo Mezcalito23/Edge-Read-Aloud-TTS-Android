@@ -71,8 +71,8 @@ Edge Read Aloud TTS, and the in-app subtitle).
 **v1.0.11** adds a button to check for the latest version and update to it.
 Nothing else changed.
 
-**Signing:** without a local keystore, release is signed with the debug key
-(sideload only). One-time keystore: [SIGNING.md](SIGNING.md).
+**Signing:** the release key stays on your machine and is not in this
+repository. Without it, `assembleRelease` is signed with the debug key.
 
 ## Updates
 
