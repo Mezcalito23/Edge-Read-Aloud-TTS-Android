@@ -34,7 +34,7 @@ to the system as each MediaCodec buffer is decoded, not after the whole MP3.
 
 ## Install
 
-No Android Studio. Install the APK on Android 8.0 or newer (minSdk 26),
+Install the APK on Android 8.0 or newer (minSdk 26),
 then pick **Edge Read Aloud TTS** as the system engine.
 
 ## Build from source
